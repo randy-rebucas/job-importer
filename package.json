@@ -1,0 +1,15 @@
+{
+  "name": "localpro-chrome-extension",
+  "version": "1.0.0",
+  "description": "Chrome Extension to import job posts from Facebook and LinkedIn into LocalPro",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "esbuild": "^0.20.2",
+    "typescript": "^5.4.5"
+  }
+}

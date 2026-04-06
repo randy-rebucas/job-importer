@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "LocalPro Job Importer",
+  "version": "1.0.0",
+  "description": "Detect and import job posts from Facebook and LinkedIn into LocalPro.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "LocalPro Job Importer"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.facebook.com/*",
+        "*://*.linkedin.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://*.facebook.com/*",
+    "*://*.linkedin.com/*",
+    "https://*.localpro.app/*",
+    "https://www.localpro.asia/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["styles.css"],
+      "matches": ["*://*.facebook.com/*", "*://*.linkedin.com/*"]
+    }
+  ]
+}
