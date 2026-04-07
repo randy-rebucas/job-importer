@@ -326,8 +326,10 @@ body {
   letter-spacing: 0.4px;
 }
 
-.platform-badge.facebook { background: #dbeafe; color: #1d4ed8; }
-.platform-badge.linkedin { background: #cffafe; color: #0e7490; }
+.platform-badge.facebook  { background: #dbeafe; color: #1d4ed8; }
+.platform-badge.linkedin  { background: #cffafe; color: #0e7490; }
+.platform-badge.jobstreet { background: #d1fae5; color: #065f46; }
+.platform-badge.indeed    { background: #fce7f3; color: #9d174d; }
 
 /* ── Loading ───────────────────────────────────────────────────────────────── */
 .loading-center {
@@ -355,3 +357,132 @@ body {
 .popup-footer a:hover { color: #1a56db; }
 
 .version { opacity: 0.6; }
+
+/* ── Import badge (header) ─────────────────────────────────────────────────── */
+.import-badge {
+  margin-left: auto;
+  background: #fff;
+  color: #1a56db;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 20px;
+  padding: 2px 8px;
+  min-width: 22px;
+  text-align: center;
+}
+
+/* ── Stats row ─────────────────────────────────────────────────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stat-card {
+  background: #f0f9ff;
+  border: 1.5px solid #bae6fd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: center;
+}
+.stat-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1e40af;
+  line-height: 1.1;
+}
+.stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-top: 2px;
+}
+
+/* ── Scan buttons ──────────────────────────────────────────────────────────── */
+.btn-scan {
+  background: #1a56db;
+  color: #fff;
+  margin-bottom: 6px;
+}
+.btn-scan:hover { background: #1e429f; }
+
+.btn-scroll-scan {
+  background: #0f766e;
+  color: #fff;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.btn-scroll-scan:hover { background: #0d5e58; }
+
+/* ── Import history ────────────────────────────────────────────────────────── */
+.history-section {
+  margin-bottom: 4px;
+}
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.history-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.history-clear {
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+.history-clear:hover { color: #ef4444; }
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+.history-empty {
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+  padding: 12px 0;
+}
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  background: #f9fafb;
+  border-radius: 7px;
+  text-decoration: none;
+  color: #111827;
+  font-size: 12px;
+  transition: background .1s;
+}
+.history-item:hover { background: #eff6ff; }
+.history-chip {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.history-chip.facebook  { background: #dbeafe; color: #1d4ed8; }
+.history-chip.linkedin  { background: #cffafe; color: #0e7490; }
+.history-chip.jobstreet { background: #d1fae5; color: #065f46; }
+.history-chip.indeed    { background: #fce7f3; color: #9d174d; }
+.history-job-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-time { flex-shrink: 0; font-size: 10px; color: #9ca3af; }

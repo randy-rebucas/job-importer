@@ -1,26 +1,34 @@
 /**
- * Content script — injected into facebook.com and linkedin.com.
+ * Content script — injected into facebook.com, linkedin.com, jobstreet.com, indeed.com.
  *
  * Flow:
  *  1. Detect platform from hostname.
- *  2. Pre-load categories + start MutationObserver in parallel.
- *  3. For each detected job post:
- *     a. Run local keyword detection (fast, synchronous).
- *     b. Inject "Import to LocalPro" button via Shadow DOM.
- *  4. On button click:
- *     a. Extract job data.
- *     b. Ask background to AI-classify the category (non-blocking).
- *     c. Open modal with real categories + AI suggestion pre-selected.
+ *  2. Inject a floating "Scan Jobs" button + "Scroll & Scan" button.
+ *  3. When scan is triggered (button click or SCAN_TAB message from popup):
+ *     a. Optionally auto-scroll to load more posts.
+ *     b. Collect all post containers from the DOM.
+ *     c. Extract job data from each.
+ *     d. Load already-imported URLs for duplicate marking.
+ *     e. Show selection panel.
+ *  4. User selects posts + sets bulk defaults → clicks Import Selected.
+ *  5. Review modal opens for each selected post in sequence.
  */
 
-import { detectJobPost, extractJobData } from "./utils/parser";
-import { injectImportButton, showJobModal } from "./utils/domHelpers";
+import { extractJobData } from "./utils/parser";
+import {
+  injectFloatingScanButton,
+  showJobSelectionPanel,
+  showJobModal,
+} from "./utils/domHelpers";
 import type {
+  BulkDefaults,
   Category,
   ClassifyCategoryMessage,
   ClassifyCategoryResponse,
   GetCategoriesMessage,
   GetCategoriesResponse,
+  GetImportHistoryMessage,
+  GetImportHistoryResponse,
   JobPost,
   Platform,
 } from "./types";
@@ -29,8 +37,10 @@ import type {
 
 function detectPlatform(): Platform | null {
   const host = window.location.hostname;
-  if (host.includes("facebook.com")) return "facebook";
-  if (host.includes("linkedin.com")) return "linkedin";
+  if (host.includes("facebook.com"))  return "facebook";
+  if (host.includes("linkedin.com"))  return "linkedin";
+  if (host.includes("jobstreet.com")) return "jobstreet";
+  if (host.includes("indeed.com"))    return "indeed";
   return null;
 }
 
@@ -40,7 +50,7 @@ if (!PLATFORM) {
   throw new Error("[LocalPro] Unsupported platform — content script exiting.");
 }
 
-// ── Category cache (populated once on init) ───────────────────────────────────
+// ── Category cache ────────────────────────────────────────────────────────────
 
 let cachedCategories: Category[] = [];
 
@@ -52,87 +62,138 @@ async function preloadCategories(): Promise<void> {
       cachedCategories = res.categories;
     }
   } catch {
-    // Background may not be ready on cold start; modal will show empty dropdown
+    // Background may not be ready on cold start
   }
 }
 
 // ── Post container selectors ──────────────────────────────────────────────────
 
-function getPostContainers(root: Element | Document): Element[] {
-  if (PLATFORM === "facebook") {
-    // [role="article"] covers the news feed, groups, and pages in modern FB.
-    // [data-pagelet^="FeedUnit"] catches FB's internal feed unit wrappers as a backup.
-    return Array.from(
-      root.querySelectorAll('[role="article"], [data-pagelet^="FeedUnit"]')
-    );
+function getPostContainers(): Element[] {
+  switch (PLATFORM) {
+    case "facebook":
+      return Array.from(
+        document.querySelectorAll('[role="article"], [data-pagelet^="FeedUnit"]')
+      );
+
+    case "linkedin":
+      return Array.from(
+        document.querySelectorAll(
+          [
+            ".feed-shared-update-v2",
+            ".occludable-update",
+            '[class*="occludable-update"]',
+            '[class*="feed-shared-update"]',
+            "li.fie-impression-container",
+            '[class*="fie-impression-container"]',
+            "[data-id]",
+            "[data-urn]",
+          ].join(", ")
+        )
+      );
+
+    case "jobstreet":
+      return Array.from(
+        document.querySelectorAll(
+          [
+            '[data-automation="normalJob"]',
+            '[data-automation="featuredJob"]',
+            "article[data-job-id]",
+            '[class*="job-item"]',
+            '[class*="JobCard"]',
+          ].join(", ")
+        )
+      );
+
+    case "indeed":
+      return Array.from(
+        document.querySelectorAll(
+          [
+            "[data-jk]",
+            ".job_seen_beacon",
+            ".resultContent",
+            '[class*="jobCard"]',
+            ".jobsearch-ResultsList > li",
+          ].join(", ")
+        )
+      );
+
+    default:
+      return [];
   }
-  // LinkedIn cycles through several class names and data-* attributes across UI versions.
-  // We cast a wide net and rely on deduplication + detectJobPost to filter noise.
-  return Array.from(
-    root.querySelectorAll(
-      [
-        ".feed-shared-update-v2",          // classic feed post wrapper
-        ".occludable-update",               // impression-tracked wrapper
-        '[class*="occludable-update"]',     // variations of occludable class
-        '[class*="feed-shared-update"]',    // broader class match
-        "li.fie-impression-container",      // newer LinkedIn feed item
-        '[class*="fie-impression-container"]',
-        "[data-id]",                        // posts with a data-id attribute
-        "[data-urn]",                       // posts with a data-urn attribute
-      ].join(", ")
-    )
-  );
 }
 
-// ── Dedup tracking ────────────────────────────────────────────────────────────
+// ── Already-imported URL set ──────────────────────────────────────────────────
 
-/**
- * Containers that have been fully processed (button injected or confirmed not
- * a job post). These are never revisited.
- */
-const processedPosts = new WeakSet<Element>();
-
-/**
- * Containers that were seen but were off-screen at scan time.
- * They are re-checked on scroll until they enter the viewport.
- */
-const offScreenPosts = new WeakSet<Element>();
-
-// ── Core scan ─────────────────────────────────────────────────────────────────
-
-function scanForJobPosts(root: Element | Document = document): void {
-  const containers = getPostContainers(root);
-
-  for (const container of containers) {
-    // Already fully handled — skip immediately.
-    if (processedPosts.has(container)) continue;
-
-    // Skip off-screen elements, but do NOT mark them as processed so the
-    // scroll handler can retry them once they enter the viewport.
-    if (!isNearViewport(container)) {
-      offScreenPosts.add(container);
-      continue;
+async function getImportedUrls(): Promise<Set<string>> {
+  try {
+    const msg: GetImportHistoryMessage = { type: "GET_IMPORT_HISTORY" };
+    const res = await chrome.runtime.sendMessage<GetImportHistoryMessage, GetImportHistoryResponse>(msg);
+    if (res?.success) {
+      return new Set(res.history.map((h) => h.source_url));
     }
-
-    // In viewport — mark fully processed regardless of whether it is a job post,
-    // so we don't re-score it on every scroll event.
-    processedPosts.add(container);
-    offScreenPosts.delete(container);
-
-    if (!detectJobPost(container)) continue;
-
-    const job: JobPost = extractJobData(container, PLATFORM!);
-
-    injectImportButton(container, job, (clickedJob) => {
-      handleImportClick(clickedJob);
-    });
+  } catch {
+    // Non-fatal
   }
+  return new Set();
 }
 
-/** Opens the modal after optionally fetching an AI category suggestion. */
-async function handleImportClick(job: JobPost): Promise<void> {
-  // Show modal immediately with whatever categories we have
-  // Attempt AI classification in parallel
+// ── Auto-scroll ───────────────────────────────────────────────────────────────
+
+async function autoScrollPage(): Promise<void> {
+  const totalScrolls = 6;
+  for (let i = 0; i < totalScrolls; i++) {
+    window.scrollBy({ top: window.innerHeight * 0.85, behavior: "smooth" });
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  // Pause briefly so dynamically loaded content settles
+  await new Promise((r) => setTimeout(r, 500));
+}
+
+// ── Scan page ─────────────────────────────────────────────────────────────────
+
+async function handleScanPage(
+  setScanningState: (scanning: boolean) => void,
+  withAutoScroll = false
+): Promise<void> {
+  setScanningState(true);
+  await new Promise((r) => setTimeout(r, 50));
+
+  if (withAutoScroll) {
+    await autoScrollPage();
+  }
+
+  const containers = getPostContainers();
+  const unique = [...new Set(containers)].filter(
+    (el) => el.textContent && el.textContent.trim().length > 20
+  );
+
+  const jobs: JobPost[] = unique.map((c) => extractJobData(c, PLATFORM!));
+
+  const [importedUrls] = await Promise.all([getImportedUrls()]);
+
+  setScanningState(false);
+
+  if (jobs.length === 0) {
+    alert("[LocalPro] No posts found on this page. Try scrolling to load more content first, or use 'Scroll & Scan'.");
+    return;
+  }
+
+  showJobSelectionPanel(jobs, importedUrls, (selected, bulkDefaults) => {
+    void processImportQueue(selected, 0, bulkDefaults);
+  });
+}
+
+// ── Import queue (sequential modals) ─────────────────────────────────────────
+
+async function processImportQueue(
+  jobs: JobPost[],
+  index: number,
+  bulkDefaults?: BulkDefaults
+): Promise<void> {
+  if (index >= jobs.length) return;
+
+  const job = jobs[index];
+
   let aiCategory: string | undefined;
 
   if (cachedCategories.length > 0) {
@@ -145,7 +206,6 @@ async function handleImportClick(job: JobPost): Promise<void> {
       };
       const res = await Promise.race([
         chrome.runtime.sendMessage<ClassifyCategoryMessage, ClassifyCategoryResponse>(msg),
-        // Timeout after 4 s so we don't block the modal
         new Promise<ClassifyCategoryResponse>((resolve) =>
           setTimeout(() => resolve({ success: false }), 4000)
         ),
@@ -154,72 +214,50 @@ async function handleImportClick(job: JobPost): Promise<void> {
         aiCategory = res.category;
       }
     } catch {
-      // Non-fatal — fall back to local detection
+      // Non-fatal
     }
   }
 
-  showJobModal(job, cachedCategories, aiCategory);
-}
+  const remaining = jobs.length - index;
 
-// ── Viewport check ────────────────────────────────────────────────────────────
-
-function isNearViewport(el: Element): boolean {
-  const rect = el.getBoundingClientRect();
-  return (
-    rect.top < window.innerHeight + 1200 &&
-    rect.bottom > -400 &&
-    rect.width > 0 &&
-    rect.height > 0
+  showJobModal(
+    job,
+    cachedCategories,
+    aiCategory,
+    remaining > 1
+      ? {
+          current: index + 1,
+          total: jobs.length,
+          onNext: () => void processImportQueue(jobs, index + 1, bulkDefaults),
+        }
+      : undefined,
+    bulkDefaults
   );
 }
 
-// ── Debounce ──────────────────────────────────────────────────────────────────
+// ── Message listener (SCAN_TAB + PING from popup) ────────────────────────────
 
-function debounce<T extends unknown[]>(fn: (...args: T) => void, ms: number) {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  return (...args: T) => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      timer = null;
-      fn(...args);
-    }, ms);
-  };
-}
-
-// ── MutationObserver ──────────────────────────────────────────────────────────
-
-const debouncedScan = debounce((nodes: Element[]) => {
-  for (const node of nodes) {
-    scanForJobPosts(node);
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "PING") {
+    sendResponse({ ok: true });
+    return true;
   }
-  scanForJobPosts(document);
-}, 300);
-
-const observer = new MutationObserver((mutations) => {
-  const added: Element[] = [];
-  for (const mutation of mutations) {
-    for (const node of mutation.addedNodes) {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        added.push(node as Element);
-      }
-    }
+  if (msg.type === "SCAN_TAB") {
+    void handleScanPage(() => {}, (msg as { autoScroll?: boolean }).autoScroll ?? false);
+    sendResponse({ ok: true });
+    return true;
   }
-  if (added.length > 0) debouncedScan(added);
 });
-
-// Scroll triggers re-scan so near-viewport posts get processed when scrolled to
-const debouncedScrollScan = debounce(() => scanForJobPosts(document), 500);
-window.addEventListener("scroll", debouncedScrollScan, { passive: true });
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
-  // Pre-load categories in background; UI scan proceeds in parallel
-  preloadCategories(); // intentionally not awaited — fire and forget
+  preloadCategories();
 
-  scanForJobPosts(document);
-
-  observer.observe(document.body, { childList: true, subtree: true });
+  injectFloatingScanButton(
+    (setState) => void handleScanPage(setState, false),
+    (setState) => void handleScanPage(setState, true)
+  );
 
   console.log(`[LocalPro] Content script active on ${PLATFORM}`);
 }

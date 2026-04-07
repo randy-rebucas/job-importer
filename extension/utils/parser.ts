@@ -1,156 +1,8 @@
 import type { JobPost, Platform } from "../types";
 
-// ── Keyword scoring ───────────────────────────────────────────────────────────
-
-const JOB_KEYWORDS: Record<string, number> = {
-  // ── Strong signals ──
-  hiring: 3,
-  "we're hiring": 4,
-  "we are hiring": 4,
-  "now hiring": 4,
-  "job opening": 4,
-  "job opportunity": 3,
-  "job vacancy": 4,
-  "job offer": 3,
-  "open position": 3,
-  "immediate hiring": 4,
-  "urgently hiring": 4,
-  "job available": 3,
-  "jobs available": 3,
-  "accepting applications": 3,
-  "looking for": 2,
-  "need a": 2,
-  "needed urgently": 3,
-  urgent: 2,
-  vacancy: 3,
-  vacancies: 3,
-  "apply now": 3,
-  "apply here": 3,
-  "send cv": 3,
-  "send resume": 3,
-  "drop your cv": 3,
-  "drop cv": 3,
-  "submit cv": 3,
-  "send application": 3,
-  "job description": 3,
-
-  // ── Work type ──
-  "full-time": 2,
-  fulltime: 2,
-  "part-time": 2,
-  parttime: 2,
-  "work from home": 2,
-  "work from office": 2,
-  wfh: 2,
-  "remote work": 2,
-  onsite: 2,
-  "on-site": 2,
-  freelance: 2,
-  contractor: 2,
-  "project-based": 2,
-
-  // ── Compensation ──
-  salary: 2,
-  "per month": 2,
-  "per day": 2,
-  "per hour": 1,
-  budget: 2,
-  compensation: 2,
-  "basic pay": 2,
-  allowance: 1,
-  benefits: 1,
-  "with benefits": 2,
-
-  // ── Contact / apply ──
-  "dm for": 2,
-  "dm us": 2,
-  "inbox us": 2,
-  "message us": 1,
-  "contact us": 1,
-  "interested applicants": 3,
-  "interested candidates": 3,
-  applicants: 2,
-  candidates: 1,
-
-  // ── Requirements / qualifications ──
-  "experience required": 2,
-  "years experience": 2,
-  "years of experience": 2,
-  "minimum experience": 2,
-  "at least": 1,
-  skills: 1,
-  qualifications: 2,
-  requirements: 1,
-  responsibilities: 2,
-  "must have": 1,
-  "must be": 1,
-  "must know": 1,
-
-  // ── Position / role ──
-  position: 1,
-  role: 1,
-  "job title": 2,
-  post: 1,
-
-  // ── Trade & service keywords ──
-  plumber: 3,
-  electrician: 3,
-  carpenter: 3,
-  painter: 3,
-  cleaner: 3,
-  driver: 2,
-  technician: 2,
-  mechanic: 2,
-  welder: 3,
-  mason: 3,
-  laborer: 3,
-  helper: 2,
-  assistant: 1,
-  manager: 1,
-  engineer: 1,
-  developer: 1,
-  designer: 1,
-  staff: 1,
-  worker: 2,
-  operator: 2,
-  supervisor: 2,
-  "service crew": 3,
-  cashier: 3,
-  "sales representative": 3,
-  "sales agent": 3,
-  "virtual assistant": 3,
-  "data entry": 3,
-  encoder: 3,
-  "customer service": 2,
-  "customer care": 2,
-  receptionist: 3,
-  "call center": 3,
-  agent: 1,
-
-  // ── Filipino / regional phrases ──
-  "naghahanap ng": 3,   // "looking for" in Tagalog
-  "nag-aanyaya": 3,     // "inviting" applicants
-  "may bakante": 4,     // "has vacancy" in Tagalog
-  "kailangan ng": 3,    // "need a" in Tagalog
-  "puwede mag-apply": 3,
-  "pwede mag-apply": 3,
-  "mag-apply na": 3,
-  "walang experience": 2,
-  "training provided": 2,
-  "open for": 2,
-  "qualified applicants": 3,
-  ofw: 2,
-  "male or female": 2,
-  "male/female": 2,
-  "accepting walk-in": 3,
-};
-
 const PHONE_REGEX = /(\+?\d[\d\s\-().]{7,15}\d)/g;
 const CURRENCY_REGEX = /(?:PHP|AED|USD|\$|₱|€|£)\s*[\d,]+|[\d,]+\s*(?:PHP|AED|USD)/gi;
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-
-/** Minimum score for a post to be considered a job post */
-const DETECTION_THRESHOLD = 4;
 
 // ── Category auto-tagging ─────────────────────────────────────────────────────
 
@@ -188,55 +40,34 @@ function autoTagCategory(text: string): string | undefined {
   return bestScore > 0 ? bestCategory : undefined;
 }
 
-// ── Scoring ───────────────────────────────────────────────────────────────────
+// ── Signal extraction (phone / currency / email) ──────────────────────────────
 
-interface ScoringResult {
-  score: number;
-  confidence: number;
+interface PostSignals {
   hasPhone: boolean;
   hasCurrency: boolean;
   hasEmail: boolean;
 }
 
-function scoreText(text: string): ScoringResult {
-  const lower = text.toLowerCase();
-  let score = 0;
-
-  for (const [keyword, weight] of Object.entries(JOB_KEYWORDS)) {
-    if (lower.includes(keyword)) {
-      score += weight;
-    }
-  }
-
+function extractSignals(text: string): PostSignals {
   const hasPhone = PHONE_REGEX.test(text);
   const hasCurrency = CURRENCY_REGEX.test(text);
   const hasEmail = EMAIL_REGEX.test(text);
 
-  // Reset regex lastIndex after test()
   PHONE_REGEX.lastIndex = 0;
   CURRENCY_REGEX.lastIndex = 0;
   EMAIL_REGEX.lastIndex = 0;
 
-  if (hasPhone) score += 2;
-  if (hasCurrency) score += 3;
-  if (hasEmail) score += 1;
-
-  // Normalize to a 0–1 confidence score; cap input at 20 for normalization
-  const confidence = Math.min(score / 20, 1);
-
-  return { score, confidence, hasPhone, hasCurrency, hasEmail };
+  return { hasPhone, hasCurrency, hasEmail };
 }
 
 // ── Public detection API ──────────────────────────────────────────────────────
 
 /**
- * Returns true if the given element looks like a job post.
+ * Always returns true — the Import button is shown on every post.
  * Exported for use in the content script scanner.
  */
-export function detectJobPost(element: Element): boolean {
-  const text = element.textContent ?? "";
-  const { score } = scoreText(text);
-  return score >= DETECTION_THRESHOLD;
+export function detectJobPost(_element: Element): boolean {
+  return true;
 }
 
 /**
@@ -245,7 +76,7 @@ export function detectJobPost(element: Element): boolean {
  */
 export function extractJobData(element: Element, platform: Platform): JobPost {
   const text = element.textContent ?? "";
-  const { confidence, hasCurrency } = scoreText(text);
+  const { hasCurrency } = extractSignals(text);
 
   let title = "";
   let description = "";
@@ -258,11 +89,22 @@ export function extractJobData(element: Element, platform: Platform): JobPost {
     description = extractFacebookDescription(element, text);
     postedBy = extractFacebookPoster(element);
     timestamp = extractFacebookTimestamp(element);
-  } else {
+  } else if (platform === "linkedin") {
     title = extractLinkedInTitle(element, text);
     description = extractLinkedInDescription(element, text);
     postedBy = extractLinkedInPoster(element);
     timestamp = extractLinkedInTimestamp(element);
+  } else if (platform === "jobstreet") {
+    title = extractJobStreetTitle(element, text);
+    description = extractJobStreetDescription(element, text);
+    postedBy = extractJobStreetCompany(element);
+    timestamp = extractGenericTimestamp(element);
+  } else {
+    // indeed
+    title = extractIndeedTitle(element, text);
+    description = extractIndeedDescription(element, text);
+    postedBy = extractIndeedCompany(element);
+    timestamp = extractGenericTimestamp(element);
   }
 
   // Fallback title from first meaningful line of text
@@ -288,7 +130,6 @@ export function extractJobData(element: Element, platform: Platform): JobPost {
     location: location ? sanitize(location) : undefined,
     budget,
     category,
-    confidence,
   };
 }
 
@@ -362,7 +203,7 @@ function extractPostUrl(element: Element, platform: Platform): string {
         return href;
       }
     }
-  } else {
+  } else if (platform === "linkedin") {
     const links = element.querySelectorAll<HTMLAnchorElement>("a[href]");
     for (const link of links) {
       const href = link.href;
@@ -370,6 +211,16 @@ function extractPostUrl(element: Element, platform: Platform): string {
         return href;
       }
     }
+  } else if (platform === "jobstreet") {
+    const link = element.querySelector<HTMLAnchorElement>("a[href*='/job/'], a[data-automation='job-list-item-link-overlay']");
+    if (link?.href) return link.href;
+    const jobId = element.getAttribute("data-job-id") ?? element.getAttribute("data-automation-id");
+    if (jobId) return `https://www.jobstreet.com.ph/job/${jobId}`;
+  } else if (platform === "indeed") {
+    const link = element.querySelector<HTMLAnchorElement>("a[href*='/rc/clk'], a[href*='/viewjob'], h2 a");
+    if (link?.href) return link.href;
+    const jk = element.getAttribute("data-jk");
+    if (jk) return `https://ph.indeed.com/viewjob?jk=${jk}`;
   }
   return window.location.href;
 }
@@ -427,6 +278,76 @@ function extractLinkedInTimestamp(element: Element): string {
   );
   if (relativeTime?.textContent) return relativeTime.textContent.trim();
 
+  return new Date().toISOString();
+}
+
+// ── JobStreet-specific extractors ─────────────────────────────────────────────
+
+function extractJobStreetTitle(element: Element, fullText: string): string {
+  const title =
+    element.querySelector('[data-automation="job-card-title"] span') ??
+    element.querySelector('[data-automation="job-card-title"]') ??
+    element.querySelector("h1, h2, h3");
+  if (title?.textContent) return title.textContent.trim();
+  const lines = fullText.split("\n").map((l) => l.trim()).filter((l) => l.length > 5 && l.length < 120);
+  return lines[0] ?? "Job Opening";
+}
+
+function extractJobStreetDescription(element: Element, fullText: string): string {
+  const desc =
+    element.querySelector('[data-automation="job-card-teaser"]') ??
+    element.querySelector('[class*="teaser"]') ??
+    element.querySelector('[class*="description"]');
+  if (desc?.textContent) return desc.textContent.trim();
+  return fullText.trim();
+}
+
+function extractJobStreetCompany(element: Element): string {
+  const company =
+    element.querySelector('[data-automation="job-card-company"]') ??
+    element.querySelector('[class*="company"]') ??
+    element.querySelector('[class*="advertiser"]');
+  return company?.textContent?.trim() ?? "";
+}
+
+// ── Indeed-specific extractors ────────────────────────────────────────────────
+
+function extractIndeedTitle(element: Element, fullText: string): string {
+  const title =
+    element.querySelector("h2.jobTitle span[title]") ??
+    element.querySelector("h2.jobTitle span:not([class])") ??
+    element.querySelector(".jobTitle a span") ??
+    element.querySelector("h2, h3");
+  if (title?.textContent) return title.textContent.trim();
+  const lines = fullText.split("\n").map((l) => l.trim()).filter((l) => l.length > 5 && l.length < 120);
+  return lines[0] ?? "Job Opening";
+}
+
+function extractIndeedDescription(element: Element, fullText: string): string {
+  const desc =
+    element.querySelector(".job-snippet") ??
+    element.querySelector('[class*="snippet"]') ??
+    element.querySelector('[class*="description"]');
+  if (desc?.textContent) return desc.textContent.trim();
+  return fullText.trim();
+}
+
+function extractIndeedCompany(element: Element): string {
+  const company =
+    element.querySelector(".companyName") ??
+    element.querySelector('[data-testid="company-name"]') ??
+    element.querySelector('[class*="company"]');
+  return company?.textContent?.trim() ?? "";
+}
+
+// ── Generic timestamp fallback ────────────────────────────────────────────────
+
+function extractGenericTimestamp(element: Element): string {
+  const timeEl = element.querySelector("time");
+  if (timeEl) {
+    const dt = timeEl.getAttribute("datetime");
+    if (dt) return new Date(dt).toISOString();
+  }
   return new Date().toISOString();
 }
 

@@ -1,10 +1,9 @@
 import type { MeResponse } from "./utils/api";
 
-export type Platform = "facebook" | "linkedin";
+export type Platform = "facebook" | "linkedin" | "jobstreet" | "indeed";
 
 // ── Domain types ──────────────────────────────────────────────────────────────
 
-/** A service category as returned by GET /api/categories */
 export interface Category {
   _id: string;
   name: string;
@@ -12,10 +11,6 @@ export interface Category {
   description: string;
 }
 
-/**
- * Locally-extracted job post data (before it is submitted to the API).
- * `categoryId` is populated after the user selects a category in the modal.
- */
 export interface JobPost {
   title: string;
   description: string;
@@ -25,32 +20,39 @@ export interface JobPost {
   timestamp: string;
   location?: string;
   budget?: number;
-  /** ISO date string (YYYY-MM-DD) set by the user in the import modal */
   scheduleDate?: string;
-  /** Human-readable category name used for display and AI classification */
   category?: string;
-  /** The `_id` of the LocalPro Category document — required for POST /api/jobs */
   categoryId?: string;
-  /** Confidence score 0–1 from the detection heuristic */
   confidence?: number;
 }
 
-/**
- * Payload sent to POST /api/jobs.
- * Source metadata is appended to the description.
- * All fields match the IJob entity requirements.
- */
+/** Shared defaults applied to every sequential modal during a bulk import. */
+export interface BulkDefaults {
+  location?: string;
+  budget?: number;
+  scheduleDate?: string;
+  urgency?: "standard" | "same_day" | "rush";
+}
+
+/** A record stored in chrome.storage.local after a successful import. */
+export interface ImportHistoryItem {
+  job_id: string;
+  title: string;
+  source: Platform;
+  source_url: string;
+  importedAt: string;
+}
+
 export interface JobImportPayload {
   title: string;
   description: string;
-  category: string;    // Category _id — required
-  budget: number;      // PHP amount — required per IJob entity
-  location: string;    // Human-readable address — required per IJob entity
-  scheduleDate: string; // ISO date string — required per IJob entity
+  category: string;
+  budget: number;
+  location: string;
+  scheduleDate: string;
   tags?: string[];
 }
 
-/** Response from POST /api/jobs (job created) */
 export interface JobCreatedResponse {
   _id: string;
   title: string;
@@ -58,7 +60,6 @@ export interface JobCreatedResponse {
   [key: string]: unknown;
 }
 
-/** Consistent error shape from the LocalPro API */
 export interface ApiError {
   error: string;
   code?: string;
@@ -96,13 +97,38 @@ export interface ClassifyCategoryMessage {
   availableCategories: string[];
 }
 
+export interface EstimateBudgetMessage {
+  type: "ESTIMATE_BUDGET";
+  title: string;
+  category: string;
+  description?: string;
+}
+
+export interface GetImportHistoryMessage {
+  type: "GET_IMPORT_HISTORY";
+}
+
+export interface GetImportStatsMessage {
+  type: "GET_IMPORT_STATS";
+}
+
+export interface InjectAndScanMessage {
+  type: "INJECT_AND_SCAN";
+  tabId: number;
+  autoScroll: boolean;
+}
+
 export type ExtensionMessage =
   | ImportJobMessage
   | GetAuthStatusMessage
   | LoginMessage
   | LogoutMessage
   | GetCategoriesMessage
-  | ClassifyCategoryMessage;
+  | ClassifyCategoryMessage
+  | EstimateBudgetMessage
+  | GetImportHistoryMessage
+  | GetImportStatsMessage
+  | InjectAndScanMessage;
 
 // ── Message response types ────────────────────────────────────────────────────
 
@@ -133,4 +159,22 @@ export interface ClassifyCategoryResponse {
   success: boolean;
   category?: string;
   error?: string;
+}
+
+export interface EstimateBudgetResponse {
+  success: boolean;
+  min?: number;
+  max?: number;
+  midpoint?: number;
+  note?: string;
+  error?: string;
+}
+
+export interface GetImportHistoryResponse {
+  success: boolean;
+  history: ImportHistoryItem[];
+}
+
+export interface GetImportStatsResponse {
+  count: number;
 }
