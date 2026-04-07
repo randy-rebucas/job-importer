@@ -79,14 +79,12 @@ function getPostContainers(): Element[] {
       return Array.from(
         document.querySelectorAll(
           [
-            ".feed-shared-update-v2",
-            ".occludable-update",
-            '[class*="occludable-update"]',
-            '[class*="feed-shared-update"]',
-            "li.fie-impression-container",
-            '[class*="fie-impression-container"]',
-            "[data-id]",
-            "[data-urn]",
+            ".feed-shared-update-v2",           // classic feed post wrapper
+            ".occludable-update",               // impression-tracked wrapper
+            "li.fie-impression-container",      // newer feed list item
+            '[data-urn^="urn:li:activity"]',    // post activity (specific prefix)
+            '[data-urn^="urn:li:share"]',       // shared post
+            '[data-urn^="urn:li:ugcPost"]',     // user-generated content post
           ].join(", ")
         )
       );
@@ -139,14 +137,42 @@ async function getImportedUrls(): Promise<Set<string>> {
 
 // ── Auto-scroll ───────────────────────────────────────────────────────────────
 
-async function autoScrollPage(): Promise<void> {
-  const totalScrolls = 6;
-  for (let i = 0; i < totalScrolls; i++) {
-    window.scrollBy({ top: window.innerHeight * 0.85, behavior: "smooth" });
-    await new Promise((r) => setTimeout(r, 700));
+/**
+ * LinkedIn renders its feed inside a scrollable container, not the window.
+ * We find that container and scroll it directly; window.scrollBy alone does nothing.
+ */
+function getScrollContainer(): Element | null {
+  if (PLATFORM === "linkedin") {
+    return (
+      document.querySelector(".scaffold-layout__main") ??
+      document.querySelector("main.scaffold-layout__main") ??
+      document.querySelector('[class*="scaffold-layout__main"]') ??
+      document.querySelector("main[role='main']") ??
+      null
+    );
   }
-  // Pause briefly so dynamically loaded content settles
-  await new Promise((r) => setTimeout(r, 500));
+  return null;
+}
+
+async function autoScrollPage(): Promise<void> {
+  const container = getScrollContainer();
+  const totalScrolls = 8;
+  const stepHeight   = window.innerHeight * 0.85;
+
+  // LinkedIn needs longer pauses for its lazy-load to fire
+  const pauseMs = PLATFORM === "linkedin" ? 1100 : 700;
+
+  for (let i = 0; i < totalScrolls; i++) {
+    if (container) {
+      container.scrollBy({ top: stepHeight, behavior: "smooth" });
+    }
+    // Always also scroll window — handles pages that use window scroll
+    window.scrollBy({ top: stepHeight, behavior: "smooth" });
+    await new Promise((r) => setTimeout(r, pauseMs));
+  }
+
+  // Final pause so lazy-loaded content settles before we scan
+  await new Promise((r) => setTimeout(r, 800));
 }
 
 // ── Scan page ─────────────────────────────────────────────────────────────────

@@ -215,6 +215,28 @@ export async function estimateBudget(
   });
 }
 
+export interface GenerateDescriptionPayload {
+  title: string;
+  category?: string;
+}
+
+export interface GenerateDescriptionApiResponse {
+  description: string;
+}
+
+/**
+ * POST /api/ai/generate-description
+ * Generates a clean, professional job description from a title and optional category.
+ */
+export async function generateDescription(
+  payload: GenerateDescriptionPayload
+): Promise<GenerateDescriptionApiResponse> {
+  return apiFetch<GenerateDescriptionApiResponse>("/api/ai/generate-description", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 // ── Jobs ──────────────────────────────────────────────────────────────────────
 
 /**

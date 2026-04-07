@@ -6,7 +6,8 @@
  *  2. GET_CATEGORIES with 24-hour in-memory cache
  *  3. CLASSIFY_CATEGORY via POST /api/ai/classify-category
  *  4. ESTIMATE_BUDGET via POST /api/ai/estimate-budget
- *  5. IMPORT_JOB → POST /api/jobs + save to history + update badge
+ *  5. GENERATE_DESCRIPTION via POST /api/ai/generate-description
+ *  6. IMPORT_JOB → POST /api/jobs + save to history + update badge
  *  6. GET_IMPORT_HISTORY / GET_IMPORT_STATS from chrome.storage.local
  */
 
@@ -17,6 +18,7 @@ import {
   getCategories,
   classifyCategory,
   estimateBudget,
+  generateDescription,
   createJob,
   API_BASE_URL,
 } from "./utils/api";
@@ -29,6 +31,7 @@ import type {
   GetCategoriesResponse,
   ClassifyCategoryResponse,
   EstimateBudgetResponse,
+  GenerateDescriptionResponse,
   GetImportHistoryResponse,
   GetImportStatsResponse,
   JobImportPayload,
@@ -136,6 +139,9 @@ async function handleMessage(
       break;
     case "ESTIMATE_BUDGET":
       await handleEstimateBudget(message.title, message.category, message.description, sendResponse);
+      break;
+    case "GENERATE_DESCRIPTION":
+      await handleGenerateDescription(message.title, message.category, sendResponse);
       break;
     case "IMPORT_JOB":
       await handleImportJob(message.payload, sendResponse);
@@ -251,6 +257,19 @@ async function handleEstimateBudget(
       midpoint: result.midpoint,
       note: result.note,
     });
+  } catch (err) {
+    sendResponse({ success: false, error: errorMessage(err) });
+  }
+}
+
+async function handleGenerateDescription(
+  title: string,
+  category: string | undefined,
+  sendResponse: (res: GenerateDescriptionResponse) => void
+): Promise<void> {
+  try {
+    const result = await generateDescription({ title, category });
+    sendResponse({ success: true, description: result.description });
   } catch (err) {
     sendResponse({ success: false, error: errorMessage(err) });
   }

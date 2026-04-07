@@ -3,6 +3,8 @@ import type {
   Category,
   EstimateBudgetMessage,
   EstimateBudgetResponse,
+  GenerateDescriptionMessage,
+  GenerateDescriptionResponse,
   ImportJobMessage,
   ImportJobResponse,
   JobPost,
@@ -420,6 +422,97 @@ const BASE_STYLES = `
   }
   .lp-estimate-btn:hover { background: #ede9fe; }
   .lp-estimate-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+  /* AI clean description button */
+  .lp-ai-clean-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    padding: 4px 10px;
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1.5px solid #bbf7d0;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+    font-family: inherit;
+  }
+  .lp-ai-clean-btn:hover { background: #dcfce7; }
+  .lp-ai-clean-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+  /* AI Smart Fill bar */
+  .lp-ai-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    background: linear-gradient(135deg, #f5f3ff 0%, #eff6ff 100%);
+    border: 1.5px solid #ddd6fe;
+    border-radius: 10px;
+    margin-bottom: 14px;
+  }
+  .lp-ai-bar-label {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: #5b21b6;
+  }
+  .lp-ai-bar-label span { font-weight: 400; color: #7c3aed; }
+  .lp-smart-fill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 13px;
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .lp-smart-fill-btn:hover { background: #6d28d9; }
+  .lp-smart-fill-btn:disabled { background: #a78bfa; cursor: not-allowed; }
+
+  /* Contact info pill */
+  .lp-contact-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 13px;
+    flex-wrap: wrap;
+  }
+  .lp-contact-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    flex-shrink: 0;
+  }
+  .lp-contact-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 20px;
+    font-size: 12px;
+    color: #334155;
+    font-weight: 500;
+    user-select: text;
+  }
 
   /* Modal footer */
   .lp-modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 22px; border-top: 1px solid #e5e7eb; }
@@ -973,6 +1066,8 @@ function buildModalOverlay(
     <div class="lp-field">
       <label class="lp-label" for="lp-description">Description <span class="lp-required">*</span></label>
       <textarea class="lp-textarea" id="lp-description" maxlength="2000" required>${escapeText(job.description)}</textarea>
+      <button type="button" class="lp-ai-clean-btn" id="lp-clean-btn">✦ Clean with AI</button>
+      <div class="lp-hint" id="lp-clean-hint"></div>
     </div>
     <div class="lp-row">
       <div class="lp-field">
@@ -1013,7 +1108,50 @@ function buildModalOverlay(
     </div>
   `;
 
+  // ── AI Smart Fill bar (injected before form) ──
+  const aiBar = document.createElement("div");
+  aiBar.className = "lp-ai-bar";
+  const aiBarLabel = document.createElement("div");
+  aiBarLabel.className = "lp-ai-bar-label";
+  aiBarLabel.innerHTML = `✦ AI Smart Fill <span>— clean description + category + budget in one click</span>`;
+  const smartFillBtn = document.createElement("button");
+  smartFillBtn.type = "button";
+  smartFillBtn.className = "lp-smart-fill-btn";
+  smartFillBtn.innerHTML = `<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Smart Fill`;
+  aiBar.appendChild(aiBarLabel);
+  aiBar.appendChild(smartFillBtn);
+  body.insertBefore(aiBar, form);
+
   body.appendChild(form);
+
+  // ── Contact info section (phone/email from post) ──
+  if (job.phone || job.email) {
+    const contactDiv = document.createElement("div");
+    contactDiv.className = "lp-contact-info";
+    const contactLabel = document.createElement("span");
+    contactLabel.className = "lp-contact-label";
+    contactLabel.textContent = "Contact";
+    contactDiv.appendChild(contactLabel);
+    if (job.phone) {
+      const chip = document.createElement("span");
+      chip.className = "lp-contact-chip";
+      chip.innerHTML = `📞 ${escapeText(job.phone)}`;
+      chip.title = "Click to copy";
+      chip.style.cursor = "pointer";
+      chip.addEventListener("click", () => { void navigator.clipboard.writeText(job.phone!); chip.innerHTML = "✓ Copied!"; setTimeout(() => { chip.innerHTML = `📞 ${escapeText(job.phone!)}`; }, 1500); });
+      contactDiv.appendChild(chip);
+    }
+    if (job.email) {
+      const chip = document.createElement("span");
+      chip.className = "lp-contact-chip";
+      chip.innerHTML = `✉️ ${escapeText(job.email)}`;
+      chip.title = "Click to copy";
+      chip.style.cursor = "pointer";
+      chip.addEventListener("click", () => { void navigator.clipboard.writeText(job.email!); chip.innerHTML = "✓ Copied!"; setTimeout(() => { chip.innerHTML = `✉️ ${escapeText(job.email!)}`; }, 1500); });
+      contactDiv.appendChild(chip);
+    }
+    body.appendChild(contactDiv);
+  }
 
   // ── AI budget estimate ──
   const estimateBtn  = shadow.getElementById("lp-estimate-btn") as HTMLButtonElement | null;
@@ -1065,6 +1203,98 @@ function buildModalOverlay(
       }
     });
   }
+
+  // ── Clean with AI ──
+  const cleanBtn  = shadow.getElementById("lp-clean-btn")  as HTMLButtonElement | null;
+  const cleanHint = shadow.getElementById("lp-clean-hint") as HTMLElement | null;
+
+  if (cleanBtn && cleanHint) {
+    cleanBtn.addEventListener("click", async () => {
+      const categoryEl = shadow.getElementById("lp-category") as HTMLSelectElement;
+      const titleEl    = shadow.getElementById("lp-title")    as HTMLInputElement;
+      const descEl     = shadow.getElementById("lp-description") as HTMLTextAreaElement;
+      const catName    = categoryEl.selectedOptions[0]?.getAttribute("data-name") ?? "";
+
+      cleanBtn.disabled = true;
+      cleanBtn.textContent = "Generating…";
+      cleanHint.textContent = "";
+
+      try {
+        const msg: GenerateDescriptionMessage = {
+          type: "GENERATE_DESCRIPTION",
+          title: titleEl.value.trim() || job.title,
+          category: catName || undefined,
+        };
+        const res: GenerateDescriptionResponse = await chrome.runtime.sendMessage(msg);
+
+        if (res?.success && res.description) {
+          descEl.value = res.description;
+          cleanHint.textContent = "✦ AI-generated — review before submitting";
+          cleanHint.className = "lp-hint ai";
+        } else {
+          cleanHint.textContent = res?.error ?? "Could not generate description.";
+          cleanHint.className = "lp-hint";
+        }
+      } catch {
+        cleanHint.textContent = "Could not reach AI service.";
+        cleanHint.className = "lp-hint";
+      } finally {
+        cleanBtn.disabled = false;
+        cleanBtn.textContent = "✦ Clean with AI";
+      }
+    });
+  }
+
+  // ── AI Smart Fill (clean description + estimate budget simultaneously) ──
+  smartFillBtn.addEventListener("click", async () => {
+    const categoryEl = shadow.getElementById("lp-category") as HTMLSelectElement;
+    const titleEl    = shadow.getElementById("lp-title")    as HTMLInputElement;
+    const descEl     = shadow.getElementById("lp-description") as HTMLTextAreaElement;
+    const budgetEl   = shadow.getElementById("lp-budget")   as HTMLInputElement;
+    const catName    = categoryEl.selectedOptions[0]?.getAttribute("data-name") ?? "";
+
+    if (!catName) {
+      smartFillBtn.textContent = "Select a category first";
+      setTimeout(() => { smartFillBtn.innerHTML = `<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Smart Fill`; }, 2000);
+      return;
+    }
+
+    smartFillBtn.disabled = true;
+    smartFillBtn.textContent = "Working…";
+
+    const titleVal = titleEl.value.trim() || job.title;
+
+    const [descRes, budgetRes] = await Promise.allSettled([
+      chrome.runtime.sendMessage<GenerateDescriptionMessage, GenerateDescriptionResponse>({
+        type: "GENERATE_DESCRIPTION",
+        title: titleVal,
+        category: catName,
+      }),
+      chrome.runtime.sendMessage<EstimateBudgetMessage, EstimateBudgetResponse>({
+        type: "ESTIMATE_BUDGET",
+        title: titleVal,
+        category: catName,
+        description: job.description.slice(0, 300),
+      }),
+    ]);
+
+    if (descRes.status === "fulfilled" && descRes.value?.success && descRes.value.description) {
+      descEl.value = descRes.value.description;
+      if (cleanHint) { cleanHint.textContent = "✦ AI-generated — review before submitting"; cleanHint.className = "lp-hint ai"; }
+    }
+    if (budgetRes.status === "fulfilled" && budgetRes.value?.success && budgetRes.value.midpoint) {
+      budgetEl.value = String(budgetRes.value.midpoint);
+      if (estimateHint) {
+        const r = budgetRes.value;
+        const range = (r.min != null && r.max != null) ? `PHP ${r.min.toLocaleString()} – ${r.max.toLocaleString()}` : "";
+        estimateHint.textContent = `✦ AI estimate: ${range}${r.note ? ` · ${r.note}` : ""}`;
+        estimateHint.className = "lp-hint ai";
+      }
+    }
+
+    smartFillBtn.disabled = false;
+    smartFillBtn.innerHTML = `<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Smart Fill`;
+  });
 
   // ── Status ──
   const status = document.createElement("div");

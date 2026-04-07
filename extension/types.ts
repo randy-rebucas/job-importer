@@ -24,6 +24,10 @@ export interface JobPost {
   category?: string;
   categoryId?: string;
   confidence?: number;
+  /** Contact phone number extracted from post text */
+  phone?: string;
+  /** Contact email address extracted from post text */
+  email?: string;
 }
 
 /** Shared defaults applied to every sequential modal during a bulk import. */
@@ -104,6 +108,12 @@ export interface EstimateBudgetMessage {
   description?: string;
 }
 
+export interface GenerateDescriptionMessage {
+  type: "GENERATE_DESCRIPTION";
+  title: string;
+  category?: string;
+}
+
 export interface GetImportHistoryMessage {
   type: "GET_IMPORT_HISTORY";
 }
@@ -126,6 +136,7 @@ export type ExtensionMessage =
   | GetCategoriesMessage
   | ClassifyCategoryMessage
   | EstimateBudgetMessage
+  | GenerateDescriptionMessage
   | GetImportHistoryMessage
   | GetImportStatsMessage
   | InjectAndScanMessage;
@@ -167,6 +178,12 @@ export interface EstimateBudgetResponse {
   max?: number;
   midpoint?: number;
   note?: string;
+  error?: string;
+}
+
+export interface GenerateDescriptionResponse {
+  success: boolean;
+  description?: string;
   error?: string;
 }
 

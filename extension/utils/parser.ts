@@ -46,18 +46,22 @@ interface PostSignals {
   hasPhone: boolean;
   hasCurrency: boolean;
   hasEmail: boolean;
+  phone?: string;
+  email?: string;
 }
 
 function extractSignals(text: string): PostSignals {
-  const hasPhone = PHONE_REGEX.test(text);
-  const hasCurrency = CURRENCY_REGEX.test(text);
-  const hasEmail = EMAIL_REGEX.test(text);
+  const phoneMatches = text.match(PHONE_REGEX);
+  const currencyMatches = text.match(CURRENCY_REGEX);
+  const emailMatches = text.match(EMAIL_REGEX);
 
-  PHONE_REGEX.lastIndex = 0;
-  CURRENCY_REGEX.lastIndex = 0;
-  EMAIL_REGEX.lastIndex = 0;
-
-  return { hasPhone, hasCurrency, hasEmail };
+  return {
+    hasPhone: phoneMatches !== null,
+    hasCurrency: currencyMatches !== null,
+    hasEmail: emailMatches !== null,
+    phone: phoneMatches?.[0]?.trim(),
+    email: emailMatches?.[0]?.trim(),
+  };
 }
 
 // ── Public detection API ──────────────────────────────────────────────────────
@@ -71,12 +75,65 @@ export function detectJobPost(_element: Element): boolean {
 }
 
 /**
+ * Returns post-body-only text by cloning the element and aggressively removing
+ * comment sections, engagement bars, and reaction counts.
+ *
+ * KEY INSIGHT: Facebook renders comment threads as nested [role="article"]
+ * elements inside the post article. Removing those nested articles eliminates
+ * virtually all comment text in one step.
+ */
+function getPostBodyText(element: Element, platform: Platform): string {
+  const clone = element.cloneNode(true) as Element;
+
+  if (platform === "facebook") {
+    // 1. Remove ALL nested [role="article"] — these are comment articles
+    clone.querySelectorAll('[role="article"]').forEach((el) => el.remove());
+
+    // 2. Remove comment forms, reaction/engagement bars, action buttons
+    [
+      'form',
+      '[role="form"]',
+      '[data-commentid]',
+      '[data-testid*="comment"]',
+      '[data-testid*="Comment"]',
+      '[data-testid*="ufi"]',
+      '[data-testid*="UFI"]',
+      '[aria-label*="eaction"]',   // "reaction", "Reaction"
+      '[aria-label*="omment"]',    // "comment", "Comment"
+      '[aria-label*="hare"]',      // "share", "Share"
+    ].forEach((sel) => clone.querySelectorAll(sel).forEach((el) => el.remove()));
+
+  } else if (platform === "linkedin") {
+    // Remove comment list, individual comments, engagement bars
+    [
+      '.comments-comments-list',
+      '.comments-comment-list',
+      '.comments-comment-item',
+      '.comments-comment-texteditor',
+      '.comments-reply-compose-box',
+      '.social-details-social-counts',
+      '.social-details-social-activity',
+      '.feed-shared-social-action-bar',
+      '.feed-shared-footer',
+      '.social-actions-bar',
+      '.update-components-footer',
+      '.update-components-social-activity',
+      '[class*="comment-"]',
+      '[class*="-comment"]',
+    ].forEach((sel) => clone.querySelectorAll(sel).forEach((el) => el.remove()));
+  }
+
+  return clone.textContent?.replace(/\s+/g, " ").trim() ?? "";
+}
+
+/**
  * Extracts structured job data from a post element.
  * Handles platform-specific DOM structure.
  */
 export function extractJobData(element: Element, platform: Platform): JobPost {
-  const text = element.textContent ?? "";
-  const { hasCurrency } = extractSignals(text);
+  // postText has comments/engagement stripped — use this for all content extraction
+  const postText = getPostBodyText(element, platform);
+  const { hasCurrency, phone, email } = extractSignals(postText);
 
   let title = "";
   let description = "";
@@ -85,40 +142,40 @@ export function extractJobData(element: Element, platform: Platform): JobPost {
   const url = window.location.href;
 
   if (platform === "facebook") {
-    title = extractFacebookTitle(element, text);
-    description = extractFacebookDescription(element, text);
+    title = extractFacebookTitle(element, postText);
+    description = extractFacebookDescription(element, postText);
     postedBy = extractFacebookPoster(element);
     timestamp = extractFacebookTimestamp(element);
   } else if (platform === "linkedin") {
-    title = extractLinkedInTitle(element, text);
-    description = extractLinkedInDescription(element, text);
+    title = extractLinkedInTitle(element, postText);
+    description = extractLinkedInDescription(element, postText);
     postedBy = extractLinkedInPoster(element);
     timestamp = extractLinkedInTimestamp(element);
   } else if (platform === "jobstreet") {
-    title = extractJobStreetTitle(element, text);
-    description = extractJobStreetDescription(element, text);
+    title = extractJobStreetTitle(element, postText);
+    description = extractJobStreetDescription(element, postText);
     postedBy = extractJobStreetCompany(element);
     timestamp = extractGenericTimestamp(element);
   } else {
     // indeed
-    title = extractIndeedTitle(element, text);
-    description = extractIndeedDescription(element, text);
+    title = extractIndeedTitle(element, postText);
+    description = extractIndeedDescription(element, postText);
     postedBy = extractIndeedCompany(element);
     timestamp = extractGenericTimestamp(element);
   }
 
-  // Fallback title from first meaningful line of text
+  // Fallback title: first meaningful line from the cleaned post text only
   if (!title) {
-    const lines = text
-      .split("\n")
+    const lines = postText
+      .split(/[\n.!?]/)
       .map((l) => l.trim())
       .filter((l) => l.length > 10 && l.length < 120);
     title = lines[0] ?? "Job Opportunity";
   }
 
-  const budget = hasCurrency ? parseBudget(text) : undefined;
-  const location = extractLocation(text);
-  const category = autoTagCategory(text);
+  const budget = hasCurrency ? parseBudget(postText) : undefined;
+  const location = extractLocation(postText);
+  const category = autoTagCategory(postText);
 
   return {
     title: sanitize(title.slice(0, 150)),
@@ -130,40 +187,59 @@ export function extractJobData(element: Element, platform: Platform): JobPost {
     location: location ? sanitize(location) : undefined,
     budget,
     category,
+    phone: phone ? sanitize(phone) : undefined,
+    email: email ? sanitize(email) : undefined,
   };
 }
 
 // ── Facebook-specific extractors ──────────────────────────────────────────────
 
-function extractFacebookTitle(element: Element, fullText: string): string {
-  // Try strong/bold tags that often contain job title
-  const strong = element.querySelector("strong");
-  if (strong?.textContent) return strong.textContent.trim();
-
-  // Try h1/h2/h3
-  for (const tag of ["h1", "h2", "h3"]) {
-    const heading = element.querySelector(tag);
-    if (heading?.textContent) return heading.textContent.trim();
+function extractFacebookTitle(element: Element, postText: string): string {
+  // Only look for <strong> tags that are NOT inside a nested article (comment)
+  const strongs = Array.from(element.querySelectorAll("strong"));
+  for (const s of strongs) {
+    if (s.closest('[role="article"]') !== element) continue; // inside a comment
+    const t = s.textContent?.trim() ?? "";
+    if (t.length > 3) return t;
   }
 
-  // Use the first capitalized sentence that matches a job pattern
-  const match = fullText.match(/(?:hiring|looking for|need)[^.!?\n]{5,80}/i);
+  // h1/h2/h3 not inside a comment
+  for (const tag of ["h1", "h2", "h3"]) {
+    const heading = element.querySelector(tag);
+    if (!heading) continue;
+    if (heading.closest('[role="article"]') !== element) continue;
+    if (heading.textContent?.trim()) return heading.textContent.trim();
+  }
+
+  // Extract first hiring-keyword sentence from post-body text only
+  const match = postText.match(/(?:hiring|looking for|need(?:ed)?|vacancy|open(?:ing)?)[^.!?\n]{5,80}/i);
   if (match) return match[0].trim();
 
   return "";
 }
 
-function extractFacebookDescription(element: Element, fullText: string): string {
-  // Facebook post text lives in div[data-ad-preview="message"] or [dir="auto"] spans
-  const textNode =
+function extractFacebookDescription(element: Element, postText: string): string {
+  // Most reliable: dedicated post-body data attributes (never inside comments)
+  const postBody =
     element.querySelector('[data-ad-preview="message"]') ??
     element.querySelector('[data-testid="post_message"]') ??
-    element.querySelector(".xdj266r") ?? // FB class for post body (changes often)
-    element.querySelector('[dir="auto"]');
+    element.querySelector('[data-testid="story-message"]');
 
-  if (textNode?.textContent) return textNode.textContent.trim();
+  if (postBody?.textContent?.trim()) return postBody.textContent.trim();
 
-  return fullText.trim();
+  // Walk [dir="auto"] elements but ONLY accept ones whose closest [role="article"]
+  // is the root post element — not a nested comment article
+  const dirAutos = Array.from(element.querySelectorAll('[dir="auto"]'));
+  for (const el of dirAutos) {
+    const closestArticle = el.closest('[role="article"]');
+    // If there's no article ancestor, or the closest one IS our root element → post body
+    if (closestArticle && closestArticle !== element) continue;
+    const text = el.textContent?.trim() ?? "";
+    if (text.length > 30) return text;
+  }
+
+  // Safe fallback: cleaned text from getPostBodyText (comments already stripped)
+  return postText;
 }
 
 function extractFacebookPoster(element: Element): string {
@@ -246,15 +322,18 @@ function extractLinkedInTitle(element: Element, fullText: string): string {
   return "";
 }
 
-function extractLinkedInDescription(element: Element, fullText: string): string {
+function extractLinkedInDescription(element: Element, postText: string): string {
+  // These selectors are scoped to post body — they never include the comments list
   const textNode =
     element.querySelector(".feed-shared-text") ??
     element.querySelector(".update-components-text") ??
-    element.querySelector(".feed-shared-update-v2__description");
+    element.querySelector(".feed-shared-update-v2__description") ??
+    element.querySelector("[data-test-id='main-feed-activity-card__commentary']");
 
   if (textNode?.textContent) return textNode.textContent.trim();
 
-  return fullText.trim();
+  // Fall back to already-cleaned text (comments stripped by getPostBodyText)
+  return postText;
 }
 
 function extractLinkedInPoster(element: Element): string {
