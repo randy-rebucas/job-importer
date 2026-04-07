@@ -480,6 +480,48 @@ const BASE_STYLES = `
   .lp-smart-fill-btn:hover { background: #6d28d9; }
   .lp-smart-fill-btn:disabled { background: #a78bfa; cursor: not-allowed; }
 
+  /* ── Per-post inline import button ── */
+  .lp-post-btn-wrap {
+    display: flex;
+    align-items: center;
+    padding: 6px 0 2px 0;
+  }
+  .lp-post-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1.5px solid #bfdbfe;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    transition: background .15s, border-color .15s, box-shadow .15s;
+    white-space: nowrap;
+    line-height: 1;
+  }
+  .lp-post-btn:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    box-shadow: 0 2px 8px rgba(29,78,216,.15);
+  }
+  .lp-post-btn:active { transform: scale(0.97); }
+  .lp-post-btn.importing {
+    background: #f3f4f6;
+    color: #6b7280;
+    border-color: #e5e7eb;
+    cursor: not-allowed;
+  }
+  .lp-post-btn.done {
+    background: #d1fae5;
+    color: #065f46;
+    border-color: #6ee7b7;
+    cursor: default;
+  }
+
   /* Contact info pill */
   .lp-contact-info {
     display: flex;
@@ -622,6 +664,99 @@ export function injectFloatingScanButton(
   wrap.appendChild(scanBtn);
   wrap.appendChild(scrollScanBtn);
   shadow.appendChild(wrap);
+}
+
+// ── Per-post inline import button ────────────────────────────────────────────
+
+const PER_POST_ATTR = "data-lp-injected";
+const PER_POST_STYLES = `
+  :host { display: block; }
+  .lp-post-btn-wrap {
+    display: flex;
+    align-items: center;
+    padding: 6px 0 2px 0;
+  }
+  .lp-post-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1.5px solid #bfdbfe;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    transition: background .15s, border-color .15s, box-shadow .15s;
+    white-space: nowrap;
+    line-height: 1;
+  }
+  .lp-post-btn:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    box-shadow: 0 2px 8px rgba(29,78,216,.15);
+  }
+  .lp-post-btn:active { transform: scale(0.97); }
+  .lp-post-btn.importing { background: #f3f4f6; color: #6b7280; border-color: #e5e7eb; cursor: not-allowed; }
+  .lp-post-btn.done { background: #d1fae5; color: #065f46; border-color: #6ee7b7; cursor: default; }
+`;
+
+const IMPORT_ICON = `<svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>`;
+
+/**
+ * Appends a small "Import to LocalPro" button to a single post container.
+ * Uses an isolated Shadow DOM so page styles never bleed in.
+ *
+ * @param container  The post element to attach the button to.
+ * @param isDup      Whether this post has already been imported (shows muted state).
+ * @param onClick    Async callback invoked when the user clicks Import.
+ *                   Receives a setter to update the button state to "done" on success.
+ */
+export function injectPerPostImportButton(
+  container: Element,
+  isDup: boolean,
+  onClick: (markDone: () => void) => void
+): void {
+  if (container.hasAttribute(PER_POST_ATTR)) return;
+  container.setAttribute(PER_POST_ATTR, "1");
+
+  const host = document.createElement("div");
+  const shadow = host.attachShadow({ mode: "open" });
+
+  const style = document.createElement("style");
+  style.textContent = PER_POST_STYLES;
+
+  const wrap = document.createElement("div");
+  wrap.className = "lp-post-btn-wrap";
+
+  const btn = document.createElement("button");
+  btn.className = "lp-post-btn" + (isDup ? " done" : "");
+  btn.innerHTML = isDup
+    ? `${IMPORT_ICON} Already imported`
+    : `${IMPORT_ICON} Import to LocalPro`;
+
+  const markDone = () => {
+    btn.className = "lp-post-btn done";
+    btn.innerHTML = `${IMPORT_ICON} Imported!`;
+  };
+
+  if (!isDup) {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (btn.classList.contains("importing") || btn.classList.contains("done")) return;
+      btn.className = "lp-post-btn importing";
+      btn.innerHTML = `${IMPORT_ICON} Opening…`;
+      onClick(markDone);
+    });
+  }
+
+  wrap.appendChild(btn);
+  shadow.appendChild(style);
+  shadow.appendChild(wrap);
+  container.appendChild(host);
 }
 
 // ── Job selection panel ───────────────────────────────────────────────────────

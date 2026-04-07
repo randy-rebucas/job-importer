@@ -1,22 +1,22 @@
 /**
  * Content script — injected into facebook.com, linkedin.com, jobstreet.com, indeed.com.
  *
- * Flow:
- *  1. Detect platform from hostname.
- *  2. Inject a floating "Scan Jobs" button + "Scroll & Scan" button.
- *  3. When scan is triggered (button click or SCAN_TAB message from popup):
- *     a. Optionally auto-scroll to load more posts.
- *     b. Collect all post containers from the DOM.
- *     c. Extract job data from each.
- *     d. Load already-imported URLs for duplicate marking.
- *     e. Show selection panel.
- *  4. User selects posts + sets bulk defaults → clicks Import Selected.
- *  5. Review modal opens for each selected post in sequence.
+ * Flow A — Per-post inline button (automatic, on page load):
+ *  1. On load and on new posts (MutationObserver), inject a small
+ *     "Import to LocalPro" button at the bottom of each post container.
+ *  2. Clicking it extracts that post's data, runs AI category classification,
+ *     and opens the review modal immediately.
+ *
+ * Flow B — Bulk scan (floating action buttons):
+ *  1. User clicks "Scan Jobs on This Page" or "Scroll & Scan".
+ *  2. All posts are collected, extracted, and shown in a selection panel.
+ *  3. User selects posts → sequential review modals.
  */
 
 import { extractJobData } from "./utils/parser";
 import {
   injectFloatingScanButton,
+  injectPerPostImportButton,
   showJobSelectionPanel,
   showJobModal,
 } from "./utils/domHelpers";
@@ -71,23 +71,30 @@ async function preloadCategories(): Promise<void> {
 function getPostContainers(): Element[] {
   switch (PLATFORM) {
     case "facebook":
+      // Filter to top-level articles only — comments are [role="article"] nested
+      // inside a parent [role="article"], so we reject anything with an ancestor article.
       return Array.from(
         document.querySelectorAll('[role="article"], [data-pagelet^="FeedUnit"]')
-      );
+      ).filter((el) => el.parentElement?.closest('[role="article"]') === null);
 
-    case "linkedin":
-      return Array.from(
-        document.querySelectorAll(
-          [
-            ".feed-shared-update-v2",           // classic feed post wrapper
-            ".occludable-update",               // impression-tracked wrapper
-            "li.fie-impression-container",      // newer feed list item
-            '[data-urn^="urn:li:activity"]',    // post activity (specific prefix)
-            '[data-urn^="urn:li:share"]',       // shared post
-            '[data-urn^="urn:li:ugcPost"]',     // user-generated content post
-          ].join(", ")
-        )
+    case "linkedin": {
+      const feedSelector = [
+        ".feed-shared-update-v2",           // classic feed post wrapper
+        ".occludable-update",               // impression-tracked wrapper
+        "li.fie-impression-container",      // newer feed list item
+        '[data-urn^="urn:li:activity"]',    // post activity
+        '[data-urn^="urn:li:share"]',       // shared post
+        '[data-urn^="urn:li:ugcPost"]',     // user-generated content post
+      ].join(", ");
+      const commentContainers =
+        ".comments-comment-item, .comments-comments-list, .comments-comment-list, " +
+        ".comments-reply-item, .social-details-social-activity";
+      return Array.from(document.querySelectorAll(feedSelector)).filter(
+        (el) =>
+          !el.closest(commentContainers) &&
+          el.parentElement?.closest(feedSelector) === null
       );
+    }
 
     case "jobstreet":
       return Array.from(
@@ -173,6 +180,123 @@ async function autoScrollPage(): Promise<void> {
 
   // Final pause so lazy-loaded content settles before we scan
   await new Promise((r) => setTimeout(r, 800));
+}
+
+// ── Per-post inline import buttons ───────────────────────────────────────────
+
+/** Set of URLs that have already been imported (loaded once on init). */
+let importedUrlCache: Set<string> = new Set();
+
+/**
+ * Runs AI category classification then opens the review modal for a single post.
+ * Re-uses the same processImportQueue path so the user gets the same experience.
+ */
+async function importSinglePost(container: Element, markDone: () => void): Promise<void> {
+  const job = extractJobData(container, PLATFORM!);
+
+  let aiCategory: string | undefined;
+  if (cachedCategories.length > 0) {
+    try {
+      const msg: ClassifyCategoryMessage = {
+        type: "CLASSIFY_CATEGORY",
+        title: job.title,
+        description: job.description,
+        availableCategories: cachedCategories.map((c) => c.name),
+      };
+      const res = await Promise.race([
+        chrome.runtime.sendMessage<ClassifyCategoryMessage, ClassifyCategoryResponse>(msg),
+        new Promise<ClassifyCategoryResponse>((resolve) =>
+          setTimeout(() => resolve({ success: false }), 4000)
+        ),
+      ]);
+      if (res?.success && res.category) aiCategory = res.category;
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  // Wrap onNext to mark the inline button as done after the modal closes / submits
+  showJobModal(job, cachedCategories, aiCategory, undefined, {});
+
+  // Mark done once the modal is shown (the user may still cancel — that's fine)
+  markDone();
+}
+
+/**
+ * Returns true only for genuine top-level post containers.
+ *
+ * Facebook and LinkedIn both render comment threads using the same element
+ * types as post containers ([role="article"], .feed-shared-update-v2, etc.).
+ * This guard ensures we only inject buttons on real posts.
+ */
+function isTopLevelContainer(el: Element): boolean {
+  switch (PLATFORM) {
+    case "facebook": {
+      // Comments are [role="article"] NESTED inside the parent feed article.
+      // A top-level post has no ancestor [role="article"].
+      return el.parentElement?.closest('[role="article"]') === null;
+    }
+
+    case "linkedin": {
+      // Replies live inside .comments-comment-item / .comments-comments-list.
+      if (
+        el.closest(
+          ".comments-comment-item, .comments-comments-list, .comments-comment-list, " +
+          ".comments-reply-item, .social-details-social-activity"
+        )
+      ) return false;
+
+      // Reject feed elements that are themselves nested inside another feed update.
+      const feedSelector =
+        ".feed-shared-update-v2, .occludable-update, li.fie-impression-container";
+      return el.parentElement?.closest(feedSelector) === null;
+    }
+
+    default:
+      // JobStreet / Indeed use card elements that don't nest in comments.
+      return true;
+  }
+}
+
+/**
+ * Inject (or update) the "Import to LocalPro" inline button on a single post container.
+ * Skips containers that are comment sections, too short, or already injected.
+ */
+function injectButtonOnPost(container: Element): void {
+  // Skip comment sections and non-top-level nested elements
+  if (!isTopLevelContainer(container)) return;
+
+  const text = container.textContent?.trim() ?? "";
+  if (text.length < 20) return;
+  if (container.hasAttribute("data-lp-injected")) return;
+
+  // Best-effort duplicate detection using the first post-link in the container
+  const firstLink = container.querySelector<HTMLAnchorElement>(
+    'a[href*="/posts/"], a[href*="story_fbid="], a[href*="?p="], a[href*="/jobs/view/"], a[href*="jk="]'
+  );
+  const isDup = firstLink ? importedUrlCache.has(firstLink.href) : false;
+
+  injectPerPostImportButton(container, isDup, (markDone) => {
+    void importSinglePost(container, markDone);
+  });
+}
+
+let _injectDebounce: ReturnType<typeof setTimeout> | null = null;
+
+/** Scans all current post containers and injects buttons on any new ones. */
+function injectAllPostButtons(): void {
+  if (_injectDebounce) clearTimeout(_injectDebounce);
+  _injectDebounce = setTimeout(() => {
+    getPostContainers().forEach(injectButtonOnPost);
+  }, 400);
+}
+
+/** Watch for new posts appearing in the feed and inject buttons automatically. */
+function observeAndInjectButtons(): void {
+  injectAllPostButtons(); // initial pass
+
+  const observer = new MutationObserver(() => injectAllPostButtons());
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 // ── Scan page ─────────────────────────────────────────────────────────────────
@@ -278,8 +402,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
-  preloadCategories();
+  // Pre-load categories and imported URL cache in parallel
+  await Promise.allSettled([
+    preloadCategories(),
+    getImportedUrls().then((urls) => { importedUrlCache = urls; }),
+  ]);
 
+  // Start per-post button injection (auto-watches for new posts via MutationObserver)
+  observeAndInjectButtons();
+
+  // Floating bulk-scan buttons
   injectFloatingScanButton(
     (setState) => void handleScanPage(setState, false),
     (setState) => void handleScanPage(setState, true)
