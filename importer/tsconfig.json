@@ -10,9 +10,9 @@
     "skipLibCheck": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "outDir": "./dist",
-    "rootDir": "./extension",
+    "rootDir": ".",
     "baseUrl": "."
   },
-  "include": ["extension/**/*"],
+  "include": ["extension/**/*", "./**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
