@@ -14,16 +14,16 @@ const sharedOptions = {
 
 const entryPoints = [
   {
-    in: "extension/content.ts",
-    out: "extension/dist/content",
+    in: "content.ts",
+    out: "dist/content",
   },
   {
-    in: "extension/background.ts",
-    out: "extension/dist/background",
+    in: "background.ts",
+    out: "dist/background",
   },
   {
-    in: "extension/popup.ts",
-    out: "extension/dist/popup",
+    in: "popup.ts",
+    out: "dist/popup",
   },
 ];
 
@@ -53,7 +53,7 @@ async function build() {
     copyStaticAssets();
 
     if (!isWatch) {
-      console.log("\nBuild complete. Load extension/dist/ in Chrome.");
+      console.log("\nBuild complete. Load dist/ in Chrome.");
     }
   } catch (err) {
     console.error("Build failed:", err);
@@ -62,26 +62,26 @@ async function build() {
 }
 
 function copyStaticAssets() {
-  const distDir = "extension/dist";
+  const distDir = "dist";
   if (!fs.existsSync(distDir)) {
     fs.mkdirSync(distDir, { recursive: true });
   }
 
   // Copy manifest
-  fs.copyFileSync("extension/manifest.json", `${distDir}/manifest.json`);
+  fs.copyFileSync("manifest.json", `${distDir}/manifest.json`);
 
   // Copy popup HTML
-  if (fs.existsSync("extension/popup.html")) {
-    fs.copyFileSync("extension/popup.html", `${distDir}/popup.html`);
+  if (fs.existsSync("popup.html")) {
+    fs.copyFileSync("popup.html", `${distDir}/popup.html`);
   }
 
   // Copy styles
-  if (fs.existsSync("extension/styles.css")) {
-    fs.copyFileSync("extension/styles.css", `${distDir}/styles.css`);
+  if (fs.existsSync("styles.css")) {
+    fs.copyFileSync("styles.css", `${distDir}/styles.css`);
   }
 
   // Copy icons directory if it exists
-  const iconsDir = "extension/icons";
+  const iconsDir = "icons";
   const distIconsDir = `${distDir}/icons`;
   if (fs.existsSync(iconsDir)) {
     if (!fs.existsSync(distIconsDir)) {

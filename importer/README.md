@@ -21,24 +21,25 @@ A production-ready Manifest V3 Chrome Extension that detects job posts on **Face
 
 ```
 localpro-crome-extension/
-├── extension/
-│   ├── manifest.json          # MV3 manifest
-│   ├── content.ts             # Content script: detection + button injection
-│   ├── background.ts          # Service worker: API calls + auth
-│   ├── popup.html             # Extension popup UI
-│   ├── popup.ts               # Popup logic: login / logout
-│   ├── styles.css             # Popup styles
-│   ├── types.ts               # Shared TypeScript types
-│   ├── utils/
-│   │   ├── parser.ts          # detectJobPost(), extractJobData(), scoring
-│   │   ├── domHelpers.ts      # Button + modal (Shadow DOM)
-│   │   └── api.ts             # Fetch wrapper for LocalPro API
-│   ├── icons/                 # PNG icons (16, 48, 128px)
-│   └── dist/                  # Build output — load THIS in Chrome
-├── build.js                   # esbuild config
-├── generate-icons.js          # Icon generator (pure Node.js)
-├── package.json
-└── tsconfig.json
+└── importer/
+    ├── extension/
+    │   ├── manifest.json          # MV3 manifest
+    │   ├── content.ts             # Content script: detection + button injection
+    │   ├── background.ts          # Service worker: API calls + auth
+    │   ├── popup.html             # Extension popup UI
+    │   ├── popup.ts               # Popup logic: login / logout
+    │   ├── styles.css             # Popup styles
+    │   ├── types.ts               # Shared TypeScript types
+    │   ├── utils/
+    │   │   ├── parser.ts          # detectJobPost(), extractJobData(), scoring
+    │   │   ├── domHelpers.ts      # Button + modal (Shadow DOM)
+    │   │   └── api.ts             # Fetch wrapper for LocalPro API
+    │   ├── icons/                 # PNG icons (16, 48, 128px)
+    │   └── dist/                  # Build output — load THIS in Chrome
+    ├── build.js                   # esbuild config
+    ├── generate-icons.js          # Icon generator (pure Node.js)
+    ├── package.json
+    └── tsconfig.json
 ```
 
 ---
@@ -48,18 +49,19 @@ localpro-crome-extension/
 ### 1. Install dependencies
 
 ```bash
+cd importer
 npm install
 ```
 
 ### 2. Configure the API base URL
 
-Open `extension/utils/api.ts` and update `API_BASE_URL`:
+Open `importer/extension/utils/api.ts` and update `API_BASE_URL`:
 
 ```ts
 export const API_BASE_URL = "https://api.localpro.app"; // your backend URL
 ```
 
-Also update `host_permissions` in `extension/manifest.json` to match your API domain.
+Also update `host_permissions` in `importer/extension/manifest.json` to match your API domain.
 
 ### 3. Build
 
@@ -67,7 +69,7 @@ Also update `host_permissions` in `extension/manifest.json` to match your API do
 npm run build
 ```
 
-Output lands in `extension/dist/`.
+Output lands in `importer/extension/dist/`.
 
 For development with auto-rebuild:
 
@@ -80,7 +82,7 @@ npm run watch
 1. Open `chrome://extensions/`
 2. Enable **Developer mode** (top right)
 3. Click **Load unpacked**
-4. Select the `extension/dist/` folder
+4. Select the `importer/extension/dist/` folder
 
 ---
 
@@ -148,10 +150,11 @@ The confidence score (0–1) is `min(score / 20, 1)` and displayed as a badge.
 ## Regenerate Icons
 
 ```bash
+cd importer
 node generate-icons.js
 ```
 
-This creates `extension/icons/icon16.png`, `icon48.png`, and `icon128.png` using pure Node.js — no external dependencies required.
+This creates `importer/extension/icons/icon16.png`, `icon48.png`, and `icon128.png` using pure Node.js — no external dependencies required.
 
 ---
 
