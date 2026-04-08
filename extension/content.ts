@@ -387,7 +387,8 @@ async function processImportQueue(
 
 // ── Message listener (SCAN_TAB + PING from popup) ────────────────────────────
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender: { id?: string }, sendResponse: (response: unknown) => void) => {
+  if (sender.id !== chrome.runtime.id) return;
   if (msg.type === "PING") {
     sendResponse({ ok: true });
     return true;

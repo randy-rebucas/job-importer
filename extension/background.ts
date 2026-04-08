@@ -366,11 +366,25 @@ async function handleImportJob(
   }
 }
 
+const SUPPORTED_HOSTS = ["facebook.com", "linkedin.com", "jobstreet.com", "indeed.com"];
+
 async function handleInjectAndScan(
   tabId: number,
   autoScroll: boolean,
   sendResponse: (res: { ok: boolean; error?: string }) => void
 ): Promise<void> {
+  // Validate tab URL before injection
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab.url || !SUPPORTED_HOSTS.some((h) => tab.url!.includes(h))) {
+      sendResponse({ ok: false, error: "Tab is not a supported job site." });
+      return;
+    }
+  } catch {
+    sendResponse({ ok: false, error: "Could not verify tab URL." });
+    return;
+  }
+
   // Check if content script is already alive
   let alive = false;
   try {

@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "LocalPro Companion",
+  "version": "1.0.0",
+  "description": "Real-time notifications, quick job posting, quotes, chat, and payment tracking for LocalPro.",
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16":  "icons/icon16.png",
+      "48":  "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "LocalPro Companion"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://*.localpro.asia/*",
+        "*://www.paymongo.com/checkout/*",
+        "*://dashboard.paymongo.com/checkout/*"
+      ],
+      "js": ["context-actions.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "activeTab",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.localpro.asia/*",
+    "https://*.localpro.asia/*",
+    "https://www.paymongo.com/*",
+    "https://dashboard.paymongo.com/*",
+    "http://localhost:3000/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["styles.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

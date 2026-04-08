@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /c/Users/corew/localpro-crome-extension/extension/dist/*.js)",
+      "Bash(grep -rn \"localStorage\\\\|sessionStorage\\\\|password\\\\|token\\\\|secret\\\\|api.key\" /c/Users/corew/localpro-crome-extension/extension/*.ts)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -n \"jose\\\\|jsonwebtoken\" /c/Users/corew/localpro-marketplace/src/lib/*.ts)",
+      "Bash(ls c:/Users/corew/localpro-marketplace/src/app/middleware*)",
+      "Bash(ls c:/Users/corew/localpro-marketplace/middleware*)",
+      "Bash(ls c:/Users/corew/localpro-marketplace/src/middleware*)",
+      "Bash(npm install:*)",
+      "Bash(node build.js)",
+      "Bash(cmd /c \"cd c:\\\\\\\\Users\\\\\\\\corew\\\\\\\\localpro-marketplace && npx tsc --noEmit 2>&1\")",
+      "Bash(ls -t /c/Users/corew/Downloads/*.png)",
+      "Bash(npm run:*)",
+      "Bash(magick --version)",
+      "Bash(convert --version)",
+      "Bash(node -e \"require\\('sharp'\\)\")",
+      "Bash(powershell -Command 'Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Image]::FromFile\\('\\\\''C:\\\\Users\\\\corew\\\\OneDrive\\\\Desktop\\\\Screenshot 2026-04-08 120033.png'\\\\''\\); Write-Host \"Width: $\\($img.Width\\) Height: $\\($img.Height\\)\"; $img.Dispose\\(\\)')"
+    ]
+  }
+}

@@ -50,6 +50,9 @@
     "https://*.localpro.asia/*",
     "https://www.localpro.asia/*"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "web_accessible_resources": [
     {
       "resources": ["styles.css"],

@@ -151,11 +151,22 @@ function renderHistory(history: ImportHistoryItem[]): void {
     row.rel = "noopener";
 
     const timeAgo = formatRelative(item.importedAt);
-    row.innerHTML = `
-      <span class="history-chip ${item.source}">${item.source.slice(0, 2).toUpperCase()}</span>
-      <span class="history-job-title">${escapeText(item.title.slice(0, 38))}${item.title.length > 38 ? "…" : ""}</span>
-      <span class="history-time">${timeAgo}</span>
-    `;
+
+    const chip = document.createElement("span");
+    chip.className = `history-chip ${item.source}`;
+    chip.textContent = item.source.slice(0, 2).toUpperCase();
+
+    const title = document.createElement("span");
+    title.className = "history-job-title";
+    title.textContent = item.title.length > 38
+      ? item.title.slice(0, 38) + "…"
+      : item.title;
+
+    const time = document.createElement("span");
+    time.className = "history-time";
+    time.textContent = timeAgo;
+
+    row.append(chip, title, time);
     historyList.appendChild(row);
   });
 }
