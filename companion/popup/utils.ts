@@ -14,6 +14,9 @@ export function formatRelative(iso: string): string {
   return `${d}d ago`;
 }
 
+/** Alias used by DisputeWizard and other components */
+export const relativeTime = formatRelative;
+
 export function formatPHP(amount: number): string {
   return new Intl.NumberFormat("en-PH", {
     style: "currency",

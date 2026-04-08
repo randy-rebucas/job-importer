@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LocalPro Companion",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Real-time notifications, quick job posting, quotes, chat, and payment tracking for LocalPro.",
   "icons": {
     "16":  "icons/icon16.png",
@@ -48,8 +48,7 @@
     "https://www.localpro.asia/*",
     "https://*.localpro.asia/*",
     "https://www.paymongo.com/*",
-    "https://dashboard.paymongo.com/*",
-    "http://localhost:3000/*"
+    "https://dashboard.paymongo.com/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

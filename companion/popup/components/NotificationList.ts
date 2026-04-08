@@ -85,7 +85,6 @@ function buildReviewCard(job: CompletedJob, onDone: () => void): HTMLElement {
   submitBtn.textContent = "Submit Review";
 
   const skipBtn = document.createElement("button");
-  submitBtn.className = "btn-primary btn-sm";
   skipBtn.className = "btn-ghost-inline";
   skipBtn.textContent = "Skip";
   skipBtn.addEventListener("click", onDone);

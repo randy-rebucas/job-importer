@@ -16,7 +16,9 @@
       "Bash(magick --version)",
       "Bash(convert --version)",
       "Bash(node -e \"require\\('sharp'\\)\")",
-      "Bash(powershell -Command 'Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Image]::FromFile\\('\\\\''C:\\\\Users\\\\corew\\\\OneDrive\\\\Desktop\\\\Screenshot 2026-04-08 120033.png'\\\\''\\); Write-Host \"Width: $\\($img.Width\\) Height: $\\($img.Height\\)\"; $img.Dispose\\(\\)')"
+      "Bash(powershell -Command 'Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Image]::FromFile\\('\\\\''C:\\\\Users\\\\corew\\\\OneDrive\\\\Desktop\\\\Screenshot 2026-04-08 120033.png'\\\\''\\); Write-Host \"Width: $\\($img.Width\\) Height: $\\($img.Height\\)\"; $img.Dispose\\(\\)')",
+      "Bash(grep 'type: \"[A-Z_]*\"' /c/Users/corew/localpro-crome-extension/companion/popup/popup.ts /c/Users/corew/localpro-crome-extension/companion/popup/components/*.ts /c/Users/corew/localpro-crome-extension/companion/content/*.ts)",
+      "Bash(wc -l echo \"All message types used in components:\" grep 'type: \"[A-Z_]*\"' /c/Users/corew/localpro-crome-extension/companion/popup/popup.ts /c/Users/corew/localpro-crome-extension/companion/popup/components/*.ts /c/Users/corew/localpro-crome-extension/companion/content/*.ts)"
     ]
   }
 }

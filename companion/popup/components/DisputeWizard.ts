@@ -1,4 +1,4 @@
-import { send, el } from "../utils";
+import { send, el, relativeTime } from "../utils";
 import { API_BASE_URL } from "../../utils/api";
 import type { MyJob, Dispute, DisputePayload } from "../../utils/api";
 
@@ -55,15 +55,16 @@ const draft: WizardDraft = {
 };
 
 function saveDraft(): void {
-  sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+  void chrome.storage.session.set({ [DRAFT_KEY]: JSON.stringify({
     job: draft.job, category: draft.category,
     description: draft.description, urgent: draft.urgent,
-  }));
+  }) });
 }
 
-function loadDraft(): boolean {
+async function loadDraft(): Promise<boolean> {
   try {
-    const raw = sessionStorage.getItem(DRAFT_KEY);
+    const stored = await chrome.storage.session.get(DRAFT_KEY);
+    const raw = stored[DRAFT_KEY] as string | undefined;
     if (!raw) return false;
     const d = JSON.parse(raw) as Partial<WizardDraft>;
     if (d.job)         draft.job         = d.job;
@@ -74,8 +75,8 @@ function loadDraft(): boolean {
   } catch { return false; }
 }
 
-function clearDraft(): void {
-  sessionStorage.removeItem(DRAFT_KEY);
+async function clearDraft(): Promise<void> {
+  await chrome.storage.session.remove(DRAFT_KEY);
   Object.assign(draft, { job: null, category: CATEGORIES[0].value, description: "", urgent: false, file: null, previewUrl: null });
 }
 
@@ -110,14 +111,15 @@ export function renderDisputeWizard(container: HTMLElement): void {
   newPill.addEventListener("click",  () => activate("new"));
   listPill.addEventListener("click", () => activate("list"));
 
-  // Restore draft if available, otherwise fresh start
-  const hasDraft = loadDraft();
-  if (hasDraft) {
-    renderDraftBanner(panel, activate);
-  } else {
-    Object.assign(draft, { job: null, category: CATEGORIES[0].value, description: "", urgent: false, file: null, previewUrl: null });
-    renderStep1(panel, activate);
-  }
+  void (async () => {
+    const hasDraft = await loadDraft();
+    if (hasDraft) {
+      renderDraftBanner(panel, activate);
+    } else {
+      Object.assign(draft, { job: null, category: CATEGORIES[0].value, description: "", urgent: false, file: null, previewUrl: null });
+      renderStep1(panel, activate);
+    }
+  })();
 }
 
 // ── Standalone tab entry points ───────────────────────────────────────────────
@@ -136,13 +138,15 @@ export function renderFileDispute(container: HTMLElement): void {
     }
   };
 
-  const hasDraft = loadDraft();
-  if (hasDraft) {
-    renderDraftBanner(panel, activate);
-  } else {
-    Object.assign(draft, { job: null, category: CATEGORIES[0].value, description: "", urgent: false, file: null, previewUrl: null });
-    renderStep1(panel, activate);
-  }
+  void (async () => {
+    const hasDraft = await loadDraft();
+    if (hasDraft) {
+      renderDraftBanner(panel, activate);
+    } else {
+      Object.assign(draft, { job: null, category: CATEGORIES[0].value, description: "", urgent: false, file: null, previewUrl: null });
+      renderStep1(panel, activate);
+    }
+  })();
 }
 
 export function renderMyDisputes(container: HTMLElement): void {
@@ -187,8 +191,7 @@ function renderDraftBanner(panel: HTMLElement, activate: Activate): void {
   });
 
   freshBtn.addEventListener("click", () => {
-    clearDraft();
-    renderStep1(panel, activate);
+    void clearDraft().then(() => renderStep1(panel, activate));
   });
 
   btns.append(resumeBtn, freshBtn);
@@ -610,7 +613,7 @@ function renderStep4(panel: HTMLElement, activate: Activate): void {
     const res = await send<DisputeResponse>({ type: "POST_DISPUTE", payload });
 
     if (res.ok) {
-      clearDraft();
+      void clearDraft();
       renderSuccess(panel, activate);
     } else {
       errorEl.textContent = res.error ?? "Failed to submit dispute.";

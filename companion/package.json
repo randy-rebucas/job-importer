@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node build.js",
     "watch": "node build.js --watch",
-    "build:prod": "NODE_ENV=production node build.js"
+    "build:prod": "node build.js --prod"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",

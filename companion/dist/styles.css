@@ -588,16 +588,341 @@ body {
 /* ═══════════════════════════════════════════════════════════════════════════
    LOGIN VIEW
    ═══════════════════════════════════════════════════════════════════════════ */
-.login-view {
+
+/* Outer wrapper — fills the full popup */
+.login-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 480px;
+  background: var(--gray-50);
+  animation: lf-enter .25s var(--ease) both;
+}
+
+@keyframes lf-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* ── Hero header ─────────────────────────────────────────────────────────── */
+.login-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 28px 20px 32px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.login-hero-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--blue-deeper) 0%, var(--blue) 55%, #3b82f6 100%);
+  z-index: 0;
+}
+
+/* Decorative circles */
+.login-hero-bg::before,
+.login-hero-bg::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,.06);
+}
+.login-hero-bg::before {
+  width: 180px; height: 180px;
+  top: -60px; right: -50px;
+}
+.login-hero-bg::after {
+  width: 110px; height: 110px;
+  bottom: -40px; left: -30px;
+}
+
+.login-hero-content {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 28px 20px 20px;
-  gap: 16px;
+  gap: 6px;
 }
-.logo { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.logo h1 { font-size: 22px; font-weight: 800; color: var(--blue); letter-spacing: -.02em; }
-.subtitle { font-size: 13px; color: var(--gray-500); text-align: center; line-height: 1.45; }
+
+.login-logo-ring {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.15);
+  border: 2px solid rgba(255,255,255,.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 16px rgba(0,0,0,.15);
+}
+
+.login-brand {
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -.03em;
+  line-height: 1;
+}
+
+.login-tagline {
+  font-size: 12px;
+  color: rgba(255,255,255,.75);
+  letter-spacing: .01em;
+  margin-top: 2px;
+}
+
+/* ── Form card ───────────────────────────────────────────────────────────── */
+.login-card {
+  background: #fff;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  margin-top: -14px;
+  padding: 24px 20px 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-shadow: 0 -2px 12px rgba(0,0,0,.06);
+  position: relative;
+  z-index: 1;
+}
+
+.login-welcome {
+  font-size: 12px;
+  color: var(--gray-500);
+  text-align: center;
+  margin-bottom: 18px;
+  line-height: 1.4;
+}
+
+/* ── Field ───────────────────────────────────────────────────────────────── */
+.lf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.lf-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--gray-700);
+  letter-spacing: .01em;
+}
+
+.lf-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lf-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--gray-400);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  transition: color var(--t);
+}
+
+.lf-input {
+  width: 100%;
+  padding: 9px 36px 9px 32px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--gray-900);
+  background: var(--gray-50);
+  outline: none;
+  transition: border-color var(--t), background var(--t), box-shadow var(--t);
+  line-height: 1.4;
+}
+
+.lf-input::placeholder { color: var(--gray-400); }
+
+.lf-input:focus {
+  border-color: var(--blue);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(26,86,219,.12);
+}
+
+.lf-input:focus + .lf-valid-icon,
+.lf-input:focus ~ .lf-eye-btn { color: var(--blue); }
+
+.lf-input:focus ~ .lf-icon,
+.lf-field:focus-within .lf-icon { color: var(--blue); }
+
+/* Valid state */
+.lf-field-ok .lf-input {
+  border-color: var(--green);
+  background: var(--green-light);
+}
+
+.lf-valid-icon {
+  position: absolute;
+  right: 10px;
+  font-size: 11px;
+  color: var(--green);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* Error state */
+.lf-field-error .lf-input {
+  border-color: var(--red);
+  background: var(--red-light);
+}
+
+.lf-hint {
+  font-size: 11px;
+  color: var(--red);
+  padding-left: 2px;
+  line-height: 1.4;
+}
+
+/* Eye toggle */
+.lf-eye-btn {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-400);
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  transition: color var(--t);
+}
+.lf-eye-btn:hover { color: var(--gray-700); }
+
+/* ── Error banner ────────────────────────────────────────────────────────── */
+.lf-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  background: var(--red-light);
+  border: 1px solid var(--red-mid);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+  font-size: 12px;
+  color: var(--red);
+  margin-bottom: 14px;
+  line-height: 1.45;
+  animation: lf-fade-in .18s var(--ease);
+}
+
+@keyframes lf-fade-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.lf-error-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin-top: 1px;
+}
+
+/* ── Submit button ───────────────────────────────────────────────────────── */
+.lf-submit {
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  letter-spacing: .01em;
+  transition: opacity var(--t), transform var(--t), box-shadow var(--t);
+  box-shadow: 0 2px 8px rgba(26,86,219,.35);
+  min-height: 40px;
+  margin-bottom: 16px;
+}
+
+.lf-submit:hover:not(:disabled) {
+  opacity: .93;
+  box-shadow: 0 4px 14px rgba(26,86,219,.45);
+  transform: translateY(-1px);
+}
+
+.lf-submit:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(26,86,219,.3);
+}
+
+.lf-submit:disabled {
+  opacity: .7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Spinner (3-dot bounce) ──────────────────────────────────────────────── */
+.lf-spinner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lf-spinner span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.9);
+  animation: lf-bounce .9s var(--ease) infinite;
+}
+
+.lf-spinner span:nth-child(2) { animation-delay: .15s; }
+.lf-spinner span:nth-child(3) { animation-delay: .30s; }
+
+@keyframes lf-bounce {
+  0%, 80%, 100% { transform: translateY(0);    opacity: .5; }
+  40%           { transform: translateY(-5px); opacity: 1;  }
+}
+
+/* ── Footer links ────────────────────────────────────────────────────────── */
+.login-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.login-forgot,
+.login-register {
+  font-size: 11.5px;
+  color: var(--blue);
+  text-decoration: none;
+  transition: color var(--t);
+}
+
+.login-forgot:hover,
+.login-register:hover { color: var(--blue-dark); text-decoration: underline; }
+
+.login-footer-sep { font-size: 11px; color: var(--gray-300); }
+
+/* ── Shake animation on bad credentials ──────────────────────────────────── */
+@keyframes lf-shake {
+  0%,100% { transform: translateX(0);  }
+  20%     { transform: translateX(-5px); }
+  40%     { transform: translateX(5px);  }
+  60%     { transform: translateX(-4px); }
+  80%     { transform: translateX(4px);  }
+}
+
+.login-card.shake { animation: lf-shake .35s var(--ease); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    NOTIFICATIONS

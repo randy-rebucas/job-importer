@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 
 const isWatch = process.argv.includes("--watch");
-const isProd = process.env.NODE_ENV === "production";
+const isProd = process.argv.includes("--prod") || process.env.NODE_ENV === "production";
 
 const sharedOptions = {
   bundle: true,

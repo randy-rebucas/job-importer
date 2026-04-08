@@ -33,50 +33,213 @@
   // popup/components/LoginView.ts
   function renderLoginView(container, onLogin) {
     container.innerHTML = `
-    <div class="login-view">
-      <div class="logo">
-        <img src="icons/icon48.png" alt="LocalPro" width="40" height="40" />
-        <h1>LocalPro</h1>
+    <div class="login-wrap">
+
+      <!-- Hero header -->
+      <div class="login-hero">
+        <div class="login-hero-bg"></div>
+        <div class="login-hero-content">
+          <div class="login-logo-ring">
+            <img src="icons/icon48.png" alt="LocalPro" width="32" height="32" />
+          </div>
+          <h1 class="login-brand">LocalPro</h1>
+          <p class="login-tagline">Your work, at your fingertips</p>
+        </div>
       </div>
-      <p class="subtitle">Sign in to access your companion</p>
-      <form id="login-form" novalidate>
-        <div class="field">
-          <label for="email">Email</label>
-          <input id="email" type="email" placeholder="you@example.com" autocomplete="email" required />
+
+      <!-- Form card -->
+      <div class="login-card">
+        <p class="login-welcome">Welcome back \u2014 sign in to continue</p>
+
+        <form id="login-form" novalidate>
+
+          <!-- Email -->
+          <div class="lf-field" id="field-email">
+            <label class="lf-label" for="email">Email address</label>
+            <div class="lf-input-wrap">
+              <span class="lf-icon">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M2 7l8 5 8-5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <input
+                id="email"
+                class="lf-input"
+                type="email"
+                placeholder="you@example.com"
+                autocomplete="email"
+                required
+              />
+              <span class="lf-valid-icon hidden" aria-hidden="true">\u2713</span>
+            </div>
+            <span class="lf-hint hidden" id="email-hint"></span>
+          </div>
+
+          <!-- Password -->
+          <div class="lf-field" id="field-password">
+            <label class="lf-label" for="password">Password</label>
+            <div class="lf-input-wrap">
+              <span class="lf-icon">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <rect x="4" y="9" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  <circle cx="10" cy="13.5" r="1.25" fill="currentColor"/>
+                </svg>
+              </span>
+              <input
+                id="password"
+                class="lf-input"
+                type="password"
+                placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                autocomplete="current-password"
+                required
+              />
+              <button type="button" class="lf-eye-btn" id="toggle-pw" tabindex="-1" aria-label="Show password">
+                <svg id="eye-show" width="15" height="15" viewBox="0 0 20 20" fill="none">
+                  <path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6S1.5 10 1.5 10z" stroke="currentColor" stroke-width="1.5"/>
+                  <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+                <svg id="eye-hide" width="15" height="15" viewBox="0 0 20 20" fill="none" class="hidden">
+                  <path d="M3 3l14 14M8.5 8.6A2.5 2.5 0 0012.4 12M6.7 5.7C4.5 7 2.5 9.5 2.5 10c.8 1.6 3.5 5.5 7.5 5.5 1.5 0 2.9-.5 4-1.3M10 4.5C14.5 4.5 17 8.5 17.5 10c-.4 1-1.3 2.5-2.7 3.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <span class="lf-hint hidden" id="pw-hint"></span>
+          </div>
+
+          <!-- Error banner -->
+          <div id="login-error" class="lf-error hidden" role="alert">
+            <span class="lf-error-icon">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M10 6v5M10 14v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span id="login-error-text"></span>
+          </div>
+
+          <!-- Submit -->
+          <button type="submit" id="login-btn" class="lf-submit">
+            <span class="lf-btn-text">Sign in</span>
+            <span class="lf-spinner hidden" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </span>
+          </button>
+
+        </form>
+
+        <div class="login-footer">
+          <a href="#" class="login-forgot" id="forgot-link">Forgot password?</a>
+          <span class="login-footer-sep">\xB7</span>
+          <a href="https://www.localpro.asia/register" class="login-register" target="_blank" rel="noopener">Create account</a>
         </div>
-        <div class="field">
-          <label for="password">Password</label>
-          <input id="password" type="password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="current-password" required />
-        </div>
-        <div id="login-error" class="error hidden"></div>
-        <button type="submit" id="login-btn" class="btn-primary">Sign in</button>
-      </form>
+      </div>
+
     </div>
   `;
     const form = container.querySelector("#login-form");
     const emailEl = container.querySelector("#email");
     const passEl = container.querySelector("#password");
     const errorEl = container.querySelector("#login-error");
+    const errorText = container.querySelector("#login-error-text");
     const btn = container.querySelector("#login-btn");
+    const btnText = container.querySelector(".lf-btn-text");
+    const spinner = container.querySelector(".lf-spinner");
+    const togglePw = container.querySelector("#toggle-pw");
+    const eyeShow = container.querySelector("#eye-show");
+    const eyeHide = container.querySelector("#eye-hide");
+    const emailHint = container.querySelector("#email-hint");
+    const emailValid = container.querySelector("#field-email .lf-valid-icon");
+    const forgotLink = container.querySelector("#forgot-link");
+    togglePw.addEventListener("click", () => {
+      const isHidden = passEl.type === "password";
+      passEl.type = isHidden ? "text" : "password";
+      eyeShow.classList.toggle("hidden", isHidden);
+      eyeHide.classList.toggle("hidden", !isHidden);
+      togglePw.setAttribute("aria-label", isHidden ? "Hide password" : "Show password");
+    });
+    emailEl.addEventListener("blur", () => {
+      const val = emailEl.value.trim();
+      const fieldEl = container.querySelector("#field-email");
+      if (!val) {
+        setFieldState(fieldEl, emailHint, emailValid, "idle");
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+        setFieldState(fieldEl, emailHint, emailValid, "error", "Enter a valid email address");
+      } else {
+        setFieldState(fieldEl, emailHint, emailValid, "ok");
+      }
+    });
+    emailEl.addEventListener("input", () => {
+      const fieldEl = container.querySelector("#field-email");
+      if (emailEl.value.trim() === "") {
+        setFieldState(fieldEl, emailHint, emailValid, "idle");
+      }
+      hideError();
+    });
+    passEl.addEventListener("input", () => hideError());
+    forgotLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      window.open("https://www.localpro.asia/forgot-password", "_blank");
+    });
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      errorEl.classList.add("hidden");
-      btn.disabled = true;
-      btn.textContent = "Signing in\u2026";
+      hideError();
+      const email = emailEl.value.trim();
+      const password = passEl.value;
+      if (!email || !password) {
+        showError("Please enter your email and password.");
+        if (!email) emailEl.focus();
+        else passEl.focus();
+        return;
+      }
+      setLoading(true);
       const res = await send({
         type: "LOGIN",
-        email: emailEl.value.trim(),
-        password: passEl.value
+        email,
+        password
       });
       if (res.ok && res.user) {
         onLogin(res.user);
       } else {
-        errorEl.textContent = res.error ?? "Login failed";
-        errorEl.classList.remove("hidden");
-        btn.disabled = false;
-        btn.textContent = "Sign in";
+        setLoading(false);
+        showError(res.error ?? "Incorrect email or password. Please try again.");
+        shakeCard();
+        passEl.value = "";
+        passEl.focus();
       }
     });
+    function setLoading(on) {
+      btn.disabled = on;
+      btnText.classList.toggle("hidden", on);
+      spinner.classList.toggle("hidden", !on);
+    }
+    function showError(msg) {
+      errorText.textContent = msg;
+      errorEl.classList.remove("hidden");
+    }
+    function hideError() {
+      errorEl.classList.add("hidden");
+    }
+    function shakeCard() {
+      const card = container.querySelector(".login-card");
+      card.classList.remove("shake");
+      void card.offsetWidth;
+      card.classList.add("shake");
+    }
+    function setFieldState(field, hint, validIcon, state, message = "") {
+      field.classList.remove("lf-field-ok", "lf-field-error");
+      hint.classList.add("hidden");
+      validIcon.classList.add("hidden");
+      if (state === "ok") {
+        field.classList.add("lf-field-ok");
+        validIcon.classList.remove("hidden");
+      } else if (state === "error") {
+        field.classList.add("lf-field-error");
+        hint.textContent = message;
+        hint.classList.remove("hidden");
+      }
+    }
   }
 
   // popup/components/NotificationList.ts
@@ -137,7 +300,6 @@
     submitBtn.className = "btn-primary btn-sm";
     submitBtn.textContent = "Submit Review";
     const skipBtn = document.createElement("button");
-    submitBtn.className = "btn-primary btn-sm";
     skipBtn.className = "btn-ghost-inline";
     skipBtn.textContent = "Skip";
     skipBtn.addEventListener("click", onDone);
@@ -638,7 +800,8 @@
       e.preventDefault();
       await checkPayment();
     });
-    trackBtn.addEventListener("click", async () => {
+    let trackedSessionId = null;
+    async function startTracking() {
       const sessionId = sessionEl.value.trim();
       const jobId = jobEl.value.trim() || void 0;
       if (!sessionId) {
@@ -648,10 +811,29 @@
       }
       const res = await send({ type: "TRACK_PAYMENT", sessionId, jobId });
       if (res.ok) {
-        trackBtn.textContent = "Tracking\u2026";
-        trackBtn.disabled = true;
+        trackedSessionId = sessionId;
+        trackBtn.textContent = "Stop Tracking";
+        trackBtn.classList.replace("btn-secondary", "btn-danger");
         resultEl.innerHTML = `<div class="success">Tracking started. You'll get a notification when payment is confirmed.</div>`;
         resultEl.classList.remove("hidden");
+      }
+    }
+    async function stopTracking() {
+      if (!trackedSessionId) return;
+      const res = await send({ type: "STOP_TRACKING_PAYMENT", sessionId: trackedSessionId });
+      if (res.ok) {
+        trackedSessionId = null;
+        trackBtn.textContent = "Track (30s)";
+        trackBtn.classList.replace("btn-danger", "btn-secondary");
+        resultEl.innerHTML = `<div class="info">Tracking stopped.</div>`;
+        resultEl.classList.remove("hidden");
+      }
+    }
+    trackBtn.addEventListener("click", async () => {
+      if (trackedSessionId) {
+        await stopTracking();
+      } else {
+        await startTracking();
       }
     });
   }
@@ -1452,16 +1634,17 @@
     previewUrl: null
   };
   function saveDraft() {
-    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+    void chrome.storage.session.set({ [DRAFT_KEY]: JSON.stringify({
       job: draft.job,
       category: draft.category,
       description: draft.description,
       urgent: draft.urgent
-    }));
+    }) });
   }
-  function loadDraft() {
+  async function loadDraft() {
     try {
-      const raw = sessionStorage.getItem(DRAFT_KEY);
+      const stored = await chrome.storage.session.get(DRAFT_KEY);
+      const raw = stored[DRAFT_KEY];
       if (!raw) return false;
       const d = JSON.parse(raw);
       if (d.job) draft.job = d.job;
@@ -1473,8 +1656,8 @@
       return false;
     }
   }
-  function clearDraft() {
-    sessionStorage.removeItem(DRAFT_KEY);
+  async function clearDraft() {
+    await chrome.storage.session.remove(DRAFT_KEY);
     Object.assign(draft, { job: null, category: CATEGORIES2[0].value, description: "", urgent: false, file: null, previewUrl: null });
   }
   function renderFileDispute(container) {
@@ -1489,13 +1672,15 @@
         renderStep1(panel, activate);
       }
     };
-    const hasDraft = loadDraft();
-    if (hasDraft) {
-      renderDraftBanner(panel, activate);
-    } else {
-      Object.assign(draft, { job: null, category: CATEGORIES2[0].value, description: "", urgent: false, file: null, previewUrl: null });
-      renderStep1(panel, activate);
-    }
+    void (async () => {
+      const hasDraft = await loadDraft();
+      if (hasDraft) {
+        renderDraftBanner(panel, activate);
+      } else {
+        Object.assign(draft, { job: null, category: CATEGORIES2[0].value, description: "", urgent: false, file: null, previewUrl: null });
+        renderStep1(panel, activate);
+      }
+    })();
   }
   function renderMyDisputes(container) {
     container.innerHTML = "";
@@ -1528,8 +1713,7 @@
       else renderStep1(panel, activate);
     });
     freshBtn.addEventListener("click", () => {
-      clearDraft();
-      renderStep1(panel, activate);
+      void clearDraft().then(() => renderStep1(panel, activate));
     });
     btns.append(resumeBtn, freshBtn);
     banner.append(icon, text, btns);
@@ -1930,7 +2114,7 @@
       };
       const res = await send({ type: "POST_DISPUTE", payload });
       if (res.ok) {
-        clearDraft();
+        void clearDraft();
         renderSuccess(panel, activate);
       } else {
         errorEl.textContent = res.error ?? "Failed to submit dispute.";
@@ -2285,12 +2469,14 @@
       id: "file-dispute",
       icon: "\u2696\uFE0F",
       name: "File Dispute",
+      roles: ["client", "provider"],
       render: (c) => renderFileDispute(c)
     },
     {
       id: "my-disputes",
       icon: "\u{1F4CB}",
       name: "My Disputes",
+      roles: ["client", "provider"],
       render: (c) => renderMyDisputes(c)
     },
     {

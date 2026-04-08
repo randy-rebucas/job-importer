@@ -80,7 +80,9 @@ export function renderPaymentStatus(container: HTMLElement): void {
     await checkPayment();
   });
 
-  trackBtn.addEventListener("click", async () => {
+  let trackedSessionId: string | null = null;
+
+  async function startTracking(): Promise<void> {
     const sessionId = sessionEl.value.trim();
     const jobId = jobEl.value.trim() || undefined;
 
@@ -92,10 +94,31 @@ export function renderPaymentStatus(container: HTMLElement): void {
 
     const res = await send<TrackResponse>({ type: "TRACK_PAYMENT", sessionId, jobId });
     if (res.ok) {
-      trackBtn.textContent = "Tracking…";
-      trackBtn.disabled = true;
+      trackedSessionId = sessionId;
+      trackBtn.textContent = "Stop Tracking";
+      trackBtn.classList.replace("btn-secondary", "btn-danger");
       resultEl.innerHTML = `<div class="success">Tracking started. You'll get a notification when payment is confirmed.</div>`;
       resultEl.classList.remove("hidden");
+    }
+  }
+
+  async function stopTracking(): Promise<void> {
+    if (!trackedSessionId) return;
+    const res = await send<TrackResponse>({ type: "STOP_TRACKING_PAYMENT", sessionId: trackedSessionId });
+    if (res.ok) {
+      trackedSessionId = null;
+      trackBtn.textContent = "Track (30s)";
+      trackBtn.classList.replace("btn-danger", "btn-secondary");
+      resultEl.innerHTML = `<div class="info">Tracking stopped.</div>`;
+      resultEl.classList.remove("hidden");
+    }
+  }
+
+  trackBtn.addEventListener("click", async () => {
+    if (trackedSessionId) {
+      await stopTracking();
+    } else {
+      await startTracking();
     }
   });
 }
