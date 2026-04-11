@@ -1,6 +1,21 @@
 import type { MeResponse } from "./utils/api";
 
-export type Platform = "facebook" | "linkedin" | "jobstreet" | "indeed";
+export type Platform = "facebook" | "marketplace" | "google-business" | "fb-groups" | "messenger";
+
+// Service types for lead classification
+export type ServiceType = 
+  | "plumbing" 
+  | "cleaning" 
+  | "repair" 
+  | "electrical" 
+  | "hvac" 
+  | "landscaping" 
+  | "painting" 
+  | "carpentry" 
+  | "roofing" 
+  | "other";
+
+export type UrgencyLevel = "low" | "medium" | "high" | "urgent" | "same-day";
 
 // ── Domain types ──────────────────────────────────────────────────────────────
 
@@ -11,7 +26,10 @@ export interface Category {
   description: string;
 }
 
-export interface JobPost {
+/**
+ * Raw lead extracted from platform (Facebook Marketplace, Google Business, FB Groups, Messenger)
+ */
+export interface Lead {
   title: string;
   description: string;
   source: Platform;
@@ -19,48 +37,88 @@ export interface JobPost {
   posted_by: string;
   timestamp: string;
   location?: string;
-  budget?: number;
-  scheduleDate?: string;
-  category?: string;
-  categoryId?: string;
+  
+  // AI-extracted fields
+  service_type?: ServiceType;
+  urgency?: UrgencyLevel;
+  estimated_budget?: {
+    min: number;
+    max: number;
+    currency?: string;
+  };
   confidence?: number;
-  /** Contact phone number extracted from post text */
+  
+  // Contact info
   phone?: string;
-  /** Contact email address extracted from post text */
   email?: string;
+  messenger_id?: string;
 }
 
-/** Shared defaults applied to every sequential modal during a bulk import. */
-export interface BulkDefaults {
+/**
+ * Classified lead with AI analysis and provider suggestions
+ */
+export interface ClassifiedLead extends Lead {
+  service_type: ServiceType;
+  urgency: UrgencyLevel;
+  estimated_budget: {
+    min: number;
+    max: number;
+    currency: string;
+  };
+  
+  // Provider matching
+  matched_providers?: string[]; // Provider IDs
+  match_confidence: number;
+  classification_analysis?: string;
+}
+
+/** Legacy type alias for backward compatibility */
+export type JobPost = Lead;
+
+/** Shared defaults applied to every sequential lead capture. */
+export interface LeadDefaults {
   location?: string;
-  budget?: number;
-  scheduleDate?: string;
-  urgency?: "standard" | "same_day" | "rush";
+  estimated_budget?: number;
+  urgency?: UrgencyLevel;
 }
 
-/** A record stored in chrome.storage.local after a successful import. */
-export interface ImportHistoryItem {
-  job_id: string;
+/** A record stored in chrome.storage.local after a successful lead capture. */
+export interface LeadHistoryItem {
+  lead_id: string;
   title: string;
+  service_type: ServiceType;
+  urgency: UrgencyLevel;
   source: Platform;
   source_url: string;
-  importedAt: string;
+  capturedAt: string;
+  matched_providers_count?: number;
 }
 
-export interface JobImportPayload {
+/** Payload for creating a lead in the system */
+export interface LeadCapturePayload {
   title: string;
   description: string;
-  category: string;
-  budget: number;
+  service_type: ServiceType;
+  urgency: UrgencyLevel;
+  estimated_budget: {
+    min: number;
+    max: number;
+    currency: string;
+  };
   location: string;
-  scheduleDate: string;
+  contact_info: {
+    phone?: string;
+    email?: string;
+    messenger_id?: string;
+  };
   tags?: string[];
 }
 
-export interface JobCreatedResponse {
+export interface LeadCreatedResponse {
   _id: string;
   title: string;
   status: string;
+  matched_providers?: string[];
   [key: string]: unknown;
 }
 
@@ -74,6 +132,24 @@ export interface ApiError {
 export interface ImportJobMessage {
   type: "IMPORT_JOB";
   payload: JobPost;
+}
+
+export interface CaptureLeadMessage {
+  type: "CAPTURE_LEAD";
+  payload: Lead;
+}
+
+export interface ClassifyLeadMessage {
+  type: "CLASSIFY_LEAD";
+  title: string;
+  description: string;
+  location: string;
+}
+
+export interface MatchProvidersMessage {
+  type: "MATCH_PROVIDERS";
+  lead: ClassifiedLead;
+  limit?: number;
 }
 
 export interface GetAuthStatusMessage {
@@ -118,8 +194,16 @@ export interface GetImportHistoryMessage {
   type: "GET_IMPORT_HISTORY";
 }
 
+export interface GetLeadHistoryMessage {
+  type: "GET_LEAD_HISTORY";
+}
+
 export interface GetImportStatsMessage {
   type: "GET_IMPORT_STATS";
+}
+
+export interface GetLeadStatsMessage {
+  type: "GET_LEAD_STATS";
 }
 
 export interface InjectAndScanMessage {
@@ -130,6 +214,9 @@ export interface InjectAndScanMessage {
 
 export type ExtensionMessage =
   | ImportJobMessage
+  | CaptureLeadMessage
+  | ClassifyLeadMessage
+  | MatchProvidersMessage
   | GetAuthStatusMessage
   | LoginMessage
   | LogoutMessage
@@ -138,7 +225,9 @@ export type ExtensionMessage =
   | EstimateBudgetMessage
   | GenerateDescriptionMessage
   | GetImportHistoryMessage
+  | GetLeadHistoryMessage
   | GetImportStatsMessage
+  | GetLeadStatsMessage
   | InjectAndScanMessage;
 
 // ── Message response types ────────────────────────────────────────────────────
@@ -192,6 +281,46 @@ export interface GetImportHistoryResponse {
   history: ImportHistoryItem[];
 }
 
+export interface GetLeadHistoryResponse {
+  success: boolean;
+  history: LeadHistoryItem[];
+}
+
 export interface GetImportStatsResponse {
   count: number;
+}
+
+export interface GetLeadStatsResponse {
+  total_leads: number;
+  leads_today: number;
+  pending_matches: number;
+  by_service_type: Record<ServiceType, number>;
+  by_urgency: Record<UrgencyLevel, number>;
+}
+
+export interface ClassifyLeadResponse {
+  success: boolean;
+  classified_lead?: ClassifiedLead;
+  service_type?: ServiceType;
+  urgency?: UrgencyLevel;
+  estimated_budget?: {
+    min: number;
+    max: number;
+    currency: string;
+  };
+  confidence?: number;
+  analysis?: string;
+  error?: string;
+}
+
+export interface MatchProvidersResponse {
+  success: boolean;
+  providers?: Array<{
+    _id: string;
+    name: string;
+    service_types?: ServiceType[];
+    rating?: number;
+    match_score: number;
+  }>;
+  error?: string;
 }

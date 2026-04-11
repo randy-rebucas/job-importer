@@ -1,8 +1,11 @@
 import type {
   AuthStatusResponse,
   GetImportHistoryResponse,
+  GetLeadHistoryResponse,
   GetImportStatsResponse,
+  GetLeadStatsResponse,
   ImportHistoryItem,
+  LeadHistoryItem,
   LoginMessage,
   LoginResponse,
   LogoutMessage,
@@ -93,21 +96,16 @@ function populateLoggedIn(user: NonNullable<AuthStatusResponse["user"]>): void {
   userRoleEl.className    = `user-role-badge role-${user.role}`;
 }
 
-// ── Import stats ──────────────────────────────────────────────────────────────
+// ── Lead stats ────────────────────────────────────────────────────────────────
 
 async function loadStats(): Promise<void> {
   try {
-    const [statsRes, histRes] = await Promise.all([
-      chrome.runtime.sendMessage<{ type: "GET_IMPORT_STATS" }, GetImportStatsResponse>({ type: "GET_IMPORT_STATS" }),
-      chrome.runtime.sendMessage<{ type: "GET_IMPORT_HISTORY" }, GetImportHistoryResponse>({ type: "GET_IMPORT_HISTORY" }),
-    ]);
+    const statsRes = await chrome.runtime.sendMessage<{ type: "GET_LEAD_STATS" }, GetLeadStatsResponse>(
+      { type: "GET_LEAD_STATS" }
+    );
 
-    const total = statsRes?.count ?? 0;
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayCount = (histRes?.history ?? []).filter(
-      (h) => new Date(h.importedAt) >= todayStart
-    ).length;
+    const total = statsRes?.total_leads ?? 0;
+    const todayCount = statsRes?.leads_today ?? 0;
 
     statTotal.textContent = String(total);
     statToday.textContent = String(todayCount);
@@ -122,12 +120,12 @@ async function loadStats(): Promise<void> {
   }
 }
 
-// ── Import history ────────────────────────────────────────────────────────────
+// ── Lead history ──────────────────────────────────────────────────────────────
 
 async function loadHistory(): Promise<void> {
   try {
-    const res = await chrome.runtime.sendMessage<{ type: "GET_IMPORT_HISTORY" }, GetImportHistoryResponse>(
-      { type: "GET_IMPORT_HISTORY" }
+    const res = await chrome.runtime.sendMessage<{ type: "GET_LEAD_HISTORY" }, GetLeadHistoryResponse>(
+      { type: "GET_LEAD_HISTORY" }
     );
     renderHistory(res?.history ?? []);
   } catch {
@@ -135,26 +133,27 @@ async function loadHistory(): Promise<void> {
   }
 }
 
-function renderHistory(history: ImportHistoryItem[]): void {
+function renderHistory(history: LeadHistoryItem[]): void {
   historyList.innerHTML = "";
 
   if (history.length === 0) {
-    historyList.innerHTML = `<div class="history-empty">No imports yet.</div>`;
+    historyList.innerHTML = `<div class="history-empty">No captured leads yet.</div>`;
     return;
   }
 
   history.slice(0, 8).forEach((item) => {
     const row = document.createElement("a");
     row.className = "history-item";
-    row.href = `https://www.localpro.asia/jobs/${item.job_id}`;
+    row.href = item.source_url;
     row.target = "_blank";
     row.rel = "noopener";
 
-    const timeAgo = formatRelative(item.importedAt);
+    const timeAgo = formatRelative(item.capturedAt);
 
     const chip = document.createElement("span");
-    chip.className = `history-chip ${item.source}`;
-    chip.textContent = item.source.slice(0, 2).toUpperCase();
+    chip.className = `history-chip history-service-${item.service_type}`;
+    chip.textContent = item.service_type.slice(0, 3).toUpperCase();
+    chip.title = `${item.service_type} - ${item.urgency}`;
 
     const title = document.createElement("span");
     title.className = "history-job-title";
@@ -183,7 +182,7 @@ function formatRelative(isoString: string): string {
 }
 
 clearHistoryBtn.addEventListener("click", async () => {
-  await chrome.storage.local.remove("import_history");
+  await chrome.storage.local.remove("lead_history");
   statTotal.textContent = "0";
   statToday.textContent = "0";
   importBadge.classList.add("hidden");
@@ -212,12 +211,12 @@ async function triggerScan(autoScroll: boolean): Promise<void> {
     const url = tab.url ?? "";
     const isSupported =
       url.includes("facebook.com") ||
-      url.includes("linkedin.com") ||
-      url.includes("jobstreet.com") ||
-      url.includes("indeed.com");
+      url.includes("messenger.com") ||
+      url.includes("google.com") ||
+      url.includes("business.google.com");
 
     if (!isSupported) {
-      showScanError("Navigate to Facebook, LinkedIn, JobStreet, or Indeed first.");
+      showScanError("Navigate to Facebook Marketplace/Groups, Messenger, or Google Business first.");
       return;
     }
 

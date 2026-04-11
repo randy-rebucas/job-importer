@@ -3,12 +3,10 @@
  *
  * Responsibilities:
  *  1. LOGIN / LOGOUT / GET_AUTH_STATUS
- *  2. GET_CATEGORIES with 24-hour in-memory cache
- *  3. CLASSIFY_CATEGORY via POST /api/ai/classify-category
- *  4. ESTIMATE_BUDGET via POST /api/ai/estimate-budget
- *  5. GENERATE_DESCRIPTION via POST /api/ai/generate-description
- *  6. IMPORT_JOB → POST /api/jobs + save to history + update badge
- *  6. GET_IMPORT_HISTORY / GET_IMPORT_STATS from chrome.storage.local
+ *  2. CLASSIFY_LEAD: Classify service type, urgency, and budget
+ *  3. MATCH_PROVIDERS: Match leads to service providers
+ *  4. CAPTURE_LEAD: Save classified lead to system
+ *  5. GET_LEAD_HISTORY / GET_LEAD_STATS from chrome.storage.local
  */
 
 import {
@@ -22,6 +20,7 @@ import {
   createJob,
   API_BASE_URL,
 } from "./utils/api";
+import { classifyLead } from "./utils/leadClassifier";
 import type {
   ExtensionMessage,
   Category,
@@ -33,9 +32,17 @@ import type {
   EstimateBudgetResponse,
   GenerateDescriptionResponse,
   GetImportHistoryResponse,
+  GetLeadHistoryResponse,
   GetImportStatsResponse,
+  GetLeadStatsResponse,
+  ClassifyLeadResponse,
+  MatchProvidersResponse,
   JobImportPayload,
+  LeadCapturePayload,
   ImportHistoryItem,
+  LeadHistoryItem,
+  Lead,
+  ClassifiedLead,
 } from "./types";
 
 // ── Category cache ─────────────────────────────────────────────────────────────
@@ -65,6 +72,7 @@ async function getCachedCategories(): Promise<Category[]> {
 // ── Import history & badge ─────────────────────────────────────────────────────
 
 const HISTORY_KEY   = "import_history";
+const LEAD_HISTORY_KEY = "lead_history";
 const MAX_HISTORY   = 50;
 
 async function saveImportRecord(item: ImportHistoryItem): Promise<void> {
@@ -83,6 +91,29 @@ async function getImportHistory(): Promise<ImportHistoryItem[]> {
   try {
     const stored = await chrome.storage.local.get(HISTORY_KEY);
     return (stored[HISTORY_KEY] as ImportHistoryItem[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ── Lead history ──────────────────────────────────────────────────────────────
+
+async function saveLeadRecord(item: LeadHistoryItem): Promise<void> {
+  try {
+    const stored = await chrome.storage.local.get(LEAD_HISTORY_KEY);
+    const history: LeadHistoryItem[] = (stored[LEAD_HISTORY_KEY] as LeadHistoryItem[]) ?? [];
+    history.unshift(item);
+    if (history.length > MAX_HISTORY) history.splice(MAX_HISTORY);
+    await chrome.storage.local.set({ [LEAD_HISTORY_KEY]: history });
+  } catch {
+    // Non-fatal
+  }
+}
+
+async function getLeadHistory(): Promise<LeadHistoryItem[]> {
+  try {
+    const stored = await chrome.storage.local.get(LEAD_HISTORY_KEY);
+    return (stored[LEAD_HISTORY_KEY] as LeadHistoryItem[]) ?? [];
   } catch {
     return [];
   }
@@ -137,6 +168,12 @@ async function handleMessage(
     case "CLASSIFY_CATEGORY":
       await handleClassifyCategory(message.title, message.description, message.availableCategories, sendResponse);
       break;
+    case "CLASSIFY_LEAD":
+      await handleClassifyLead(message.title, message.description, message.location, sendResponse);
+      break;
+    case "MATCH_PROVIDERS":
+      await handleMatchProviders(message.lead, message.limit, sendResponse);
+      break;
     case "ESTIMATE_BUDGET":
       await handleEstimateBudget(message.title, message.category, message.description, sendResponse);
       break;
@@ -146,11 +183,20 @@ async function handleMessage(
     case "IMPORT_JOB":
       await handleImportJob(message.payload, sendResponse);
       break;
+    case "CAPTURE_LEAD":
+      await handleCaptureLead(message.payload, sendResponse);
+      break;
     case "GET_IMPORT_HISTORY":
       await handleGetImportHistory(sendResponse);
       break;
+    case "GET_LEAD_HISTORY":
+      await handleGetLeadHistory(sendResponse);
+      break;
     case "GET_IMPORT_STATS":
       await handleGetImportStats(sendResponse);
+      break;
+    case "GET_LEAD_STATS":
+      await handleGetLeadStats(sendResponse);
       break;
     case "INJECT_AND_SCAN":
       await handleInjectAndScan(message.tabId, message.autoScroll, sendResponse);
@@ -289,6 +335,125 @@ async function handleGetImportStats(
   sendResponse({ count: history.length });
 }
 
+// ── Lead-specific handlers ───────────────────────────────────────────────────
+
+async function handleClassifyLead(
+  title: string,
+  description: string,
+  location: string,
+  sendResponse: (res: ClassifyLeadResponse) => void
+): Promise<void> {
+  try {
+    const lead: Lead = {
+      title,
+      description,
+      location,
+      source: "facebook", // Default source, could be passed in
+      source_url: "",
+      posted_by: "Unknown",
+      timestamp: new Date().toISOString()
+    };
+
+    const classifiedLead = classifyLead(lead);
+
+    sendResponse({
+      success: true,
+      classified_lead: classifiedLead,
+      service_type: classifiedLead.service_type,
+      urgency: classifiedLead.urgency,
+      estimated_budget: classifiedLead.estimated_budget,
+      confidence: classifiedLead.match_confidence,
+      analysis: classifiedLead.classification_analysis
+    });
+  } catch (err) {
+    sendResponse({ success: false, error: errorMessage(err) });
+  }
+}
+
+async function handleMatchProviders(
+  lead: ClassifiedLead,
+  limit: number = 5,
+  sendResponse: (res: MatchProvidersResponse) => void
+): Promise<void> {
+  try {
+    // TODO: Call API to match providers based on lead classification
+    // For now, return empty providers list - this would connect to the backend API
+    sendResponse({
+      success: true,
+      providers: []
+    });
+  } catch (err) {
+    sendResponse({ success: false, error: errorMessage(err) });
+  }
+}
+
+async function handleCaptureLead(
+  payload: Lead,
+  sendResponse: (res: { success: boolean; lead_id?: string; error?: string }) => void
+): Promise<void> {
+  try {
+    // Classify the lead
+    const classifiedLead = classifyLead(payload);
+
+    // TODO: Call API to save lead to the system
+    // For now, just save to history
+    const leadId = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    await saveLeadRecord({
+      lead_id: leadId,
+      title: classifiedLead.title,
+      service_type: classifiedLead.service_type,
+      urgency: classifiedLead.urgency,
+      source: classifiedLead.source,
+      source_url: classifiedLead.source_url,
+      capturedAt: new Date().toISOString(),
+      matched_providers_count: classifiedLead.matched_providers?.length ?? 0
+    });
+
+    await updateBadge();
+
+    sendResponse({ success: true, lead_id: leadId });
+  } catch (err) {
+    sendResponse({ success: false, error: errorMessage(err) });
+  }
+}
+
+async function handleGetLeadHistory(
+  sendResponse: (res: GetLeadHistoryResponse) => void
+): Promise<void> {
+  const history = await getLeadHistory();
+  sendResponse({ success: true, history });
+}
+
+async function handleGetLeadStats(
+  sendResponse: (res: GetLeadStatsResponse) => void
+): Promise<void> {
+  const history = await getLeadHistory();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const todayLeads = history.filter(
+    (h) => new Date(h.capturedAt) >= today
+  );
+
+  // Group by service type and urgency
+  const byServiceType: Record<string, number> = {};
+  const byUrgency: Record<string, number> = {};
+
+  for (const lead of history) {
+    byServiceType[lead.service_type] = (byServiceType[lead.service_type] ?? 0) + 1;
+    byUrgency[lead.urgency] = (byUrgency[lead.urgency] ?? 0) + 1;
+  }
+
+  sendResponse({
+    total_leads: history.length,
+    leads_today: todayLeads.length,
+    pending_matches: todayLeads.filter(l => !l.matched_providers_count).length,
+    by_service_type: byServiceType as Record<any, number>,
+    by_urgency: byUrgency as Record<any, number>
+  });
+}
+
 async function handleImportJob(
   job: import("./types").JobPost,
   sendResponse: (res: ImportJobResponse) => void
@@ -366,7 +531,7 @@ async function handleImportJob(
   }
 }
 
-const SUPPORTED_HOSTS = ["facebook.com", "linkedin.com", "jobstreet.com", "indeed.com"];
+const SUPPORTED_HOSTS = ["facebook.com", "messenger.com", "google.com", "maps.google.com", "business.google.com"];
 
 async function handleInjectAndScan(
   tabId: number,
@@ -377,7 +542,7 @@ async function handleInjectAndScan(
   try {
     const tab = await chrome.tabs.get(tabId);
     if (!tab.url || !SUPPORTED_HOSTS.some((h) => tab.url!.includes(h))) {
-      sendResponse({ ok: false, error: "Tab is not a supported job site." });
+      sendResponse({ ok: false, error: "Tab is not a supported lead source (Facebook, Messenger, Google Business)." });
       return;
     }
   } catch {
@@ -427,4 +592,4 @@ function errorMessage(err: unknown): string {
 // Refresh badge on service worker startup
 void updateBadge();
 
-console.log(`[LocalPro] Background service worker started. API: ${API_BASE_URL}`);
+console.log(`[LocalPro] Lead Engine background service worker started. API: ${API_BASE_URL}`);

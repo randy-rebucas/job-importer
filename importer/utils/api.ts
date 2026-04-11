@@ -9,7 +9,7 @@
  * If the refresh also fails, it throws an error with code "SESSION_EXPIRED".
  */
 
-import type { Category, JobImportPayload, JobCreatedResponse, ApiError } from "../types";
+import type { Category, LeadCreatedResponse, ApiError } from "../types";
 
 /**
  * Base URL for the LocalPro API.
@@ -239,12 +239,16 @@ export async function generateDescription(
 
 // ── Jobs ──────────────────────────────────────────────────────────────────────
 
+export interface JobImportPayload {
+  [key: string]: unknown;
+}
+
 /**
  * POST /api/jobs
  * Creates a new job. The caller is responsible for passing a valid categoryId.
  */
-export async function createJob(payload: JobImportPayload): Promise<JobCreatedResponse> {
-  return apiFetch<JobCreatedResponse>("/api/jobs", {
+export async function createJob(payload: JobImportPayload): Promise<LeadCreatedResponse> {
+  return apiFetch<LeadCreatedResponse>("/api/jobs", {
     method: "POST",
     body: JSON.stringify(payload),
   });
